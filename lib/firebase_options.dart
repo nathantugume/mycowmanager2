@@ -47,26 +47,26 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAupqhIojooOkp-kQ6e5lyGxavLl2i6luQ',
-    appId: '1:451594729231:web:2558e71eca768df151707a',
-    messagingSenderId: '451594729231',
+    apiKey: 'AIzaSyAupqhIl2i6luQ',
+    appId: '1:45159471:web:25581707a',
+    messagingSenderId: '45159431',
     projectId: 'mycattlemonitor',
     authDomain: 'mycattlemonitor.firebaseapp.com',
     storageBucket: 'mycattlemonitor.firebasestorage.app',
-    measurementId: 'G-5K2PSECC3L',
+    measurementId: 'G-5K2P',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyC9TJxi7qSd7Gc9WaV4pOKp3ivI__fJtY0',
-    appId: '1:451594729231:android:ef678d62ebe847b451707a',
-    messagingSenderId: '451594729231',
+    apiKey: 'AIzaSyC9T4pOKp3ivI__fJtY0',
+    appId: '1:45159471:androebe84707a',
+    messagingSenderId: '4231',
     projectId: 'mycattlemonitor',
     storageBucket: 'mycattlemonitor.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAgBJp8VpByy9llZvpGQmVQ_VDqp0MeAoI',
-    appId: '1:451594729231:ios:755cb7cd07765f1b51707a',
+    apiKey: 'AIzaSyAgBJp8VpB0MeA',
+    appId: '1:45159472:1b51707a',
     messagingSenderId: '451594729231',
     projectId: 'mycattlemonitor',
     storageBucket: 'mycattlemonitor.firebasestorage.app',
