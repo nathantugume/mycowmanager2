@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "451594729231",
+    "project_id": "mycattlemonitor",
+    "storage_bucket": "mycattlemonitor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451594729231:android:6f86511789b05eaf51707a",
+        "android_client_info": {
+          "package_name": "com.bridge.mycattlemonitor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9TJxi7qSd7Gc9WaV4pOKp3ivI__fJtY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451594729231:android:ef678d62ebe847b451707a",
+        "android_client_info": {
+          "package_name": "com.example.mycowmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9TJxi7qSd7Gc9WaV4pOKp3ivI__fJtY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:451594729231:android:3bbb8ad31af8b65351707a",
+        "android_client_info": {
+          "package_name": "com.mycompany.mycowmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9TJxi7qSd7Gc9WaV4pOKp3ivI__fJtY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

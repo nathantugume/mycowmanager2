@@ -1,0 +1,23 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "mycattlemonitor",
+          "appId": "1:451594729231:android:ef678d62ebe847b451707a",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "mycattlemonitor",
+          "configurations": {
+            "android": "1:451594729231:android:ef678d62ebe847b451707a",
+            "ios": "1:451594729231:ios:755cb7cd07765f1b51707a",
+            "web": "1:451594729231:web:2558e71eca768df151707a"
+          }
+        }
+      }
+    }
+  }
+}
