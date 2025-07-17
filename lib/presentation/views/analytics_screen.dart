@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:mycowmanager/presentation/views/activities_report.dart';
 import 'package:mycowmanager/presentation/views/cattle_report.dart';
 import 'package:mycowmanager/presentation/views/groups_report.dart';
 import 'package:mycowmanager/presentation/views/milk_report.dart';
@@ -101,6 +102,7 @@ class _AnalyticsScreenBody extends StatelessWidget{
           imageName: 'assets/images/tasks.png',
           color: Colors.white,
           onTap: (){
+            Navigator.of(context).push(MaterialPageRoute(builder: (_)=>const ActivitiesReportScreen()));
           }
       ),
 
