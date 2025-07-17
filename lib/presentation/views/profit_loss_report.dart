@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../models/financial_entry/financial_entry.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
 
 class ProfitLossReportScreen extends StatefulWidget {
   const ProfitLossReportScreen({super.key});
@@ -27,6 +27,52 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
   List<IncomeEntry> _filteredIncomes = [];
   List<ExpenseEntry> _filteredExpenses = [];
 
+  List<PnLChartData> _chartData = [];
+
+  void _applyFilters() {
+    // Filter incomes
+    _filteredIncomes = _allIncomes.where((e) {
+      final inRange = _selectedRange == null ||
+          (DateTime.parse(e.date)
+                  .isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
+              DateTime.parse(e.date)
+                  .isBefore(_selectedRange!.end.add(const Duration(days: 1))));
+      final categoryMatch =
+          _selectedCategory == null || e.category == _selectedCategory;
+      final typeMatch = _selectedType == 'Income' || _selectedType == 'Both';
+      return inRange && categoryMatch && typeMatch;
+    }).toList();
+
+    // Filter expenses
+    _filteredExpenses = _allExpenses.where((e) {
+      final inRange = _selectedRange == null ||
+          (DateTime.parse(e.date)
+                  .isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
+              DateTime.parse(e.date)
+                  .isBefore(_selectedRange!.end.add(const Duration(days: 1))));
+      final categoryMatch =
+          _selectedCategory == null || e.category == _selectedCategory;
+      final typeMatch = _selectedType == 'Expense' || _selectedType == 'Both';
+      return inRange && categoryMatch && typeMatch;
+    }).toList();
+
+    // Update KPIs
+    _totalIncome = _filteredIncomes.fold(0, (sum, e) => sum + e.amount);
+    _totalExpense = _filteredExpenses.fold(0, (sum, e) => sum + e.amount);
+
+    // Update categories
+    _updateAvailableCategories();
+    _chartData = _buildChartData();
+
+    setState(() {});
+  }
+
+  void _updateAvailableCategories() {
+    final incomeCats = _allIncomes.map((e) => e.category);
+    final expenseCats = _allExpenses.map((e) => e.category);
+    _availableCategories = {...incomeCats, ...expenseCats}.toList()..sort();
+  }
+
   List<PnLChartData> _buildChartData() {
     final Map<String, double> incomeMap = {};
     final Map<String, double> expenseMap = {};
@@ -48,6 +94,15 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
         expense: expenseMap[period] ?? 0,
       );
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // You would typically fetch real data here
+    _allIncomes = []; // Replace with actual data fetching
+    _allExpenses = []; // Replace with actual data fetching
+    _applyFilters();
   }
 
   @override
@@ -84,17 +139,44 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
             const SizedBox(height: 16),
 
             // 3. Chart Section (Income/Expense/Net Profit)
-            _PnLChart(data: _buildChartData()),
+            _PnLChart(data: _chartData),
 
             const SizedBox(height: 16),
 
             // 4. Table Section (detailed entries)
-            Expanded(child: _PnLTable()),
+            Expanded(
+              child: _PnLTable(
+                entries: [..._filteredIncomes, ..._filteredExpenses]..sort((a, b) => b.date.compareTo(a.date)),
+              ),
+            ),
 
             const SizedBox(height: 16),
 
             // 5. Export Row (checkbox + button)
             _ExportRow(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _KpiCard extends StatelessWidget {
+  final String title;
+  final String value;
+
+  const _KpiCard({required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Text(value, style: Theme.of(context).textTheme.headlineSmall),
           ],
         ),
       ),
@@ -247,28 +329,66 @@ class _PnLChart extends StatelessWidget {
 }
 
 class _PnLTable extends StatelessWidget {
+  final List<FinancialEntry> entries;
+
+  const _PnLTable({required this.entries});
+
   @override
   Widget build(BuildContext context) {
     // Use DataTable with filtered entry data
     return SingleChildScrollView(
       child: DataTable(
-        columns: [/* Date, Title, Category, Amount, Type */],
-        rows: [/* ... */],
+        columns: const [
+          DataColumn(label: Text('Date')),
+          DataColumn(label: Text('Title')),
+          DataColumn(label: Text('Category')),
+          DataColumn(label: Text('Amount')),
+          DataColumn(label: Text('Type')),
+        ],
+        rows: entries.map((entry) {
+          final isIncome = entry is IncomeEntry;
+          return DataRow(
+            cells: [
+              DataCell(Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(entry.date)))),
+              DataCell(Text(entry.title)),
+              DataCell(Text(entry.category)),
+              DataCell(Text(entry.amount.toStringAsFixed(2))),
+              DataCell(Text(isIncome ? 'Income' : 'Expense')),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 }
 
-class _ExportRow extends StatelessWidget {
+class _ExportRow extends StatefulWidget {
+  @override
+  State<_ExportRow> createState() => _ExportRowState();
+}
+
+class _ExportRowState extends State<_ExportRow> {
+  bool _includeChart = true;
+
+  void _exportToPdf() {
+    // TODO: Implement PDF export logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Exporting to PDF... (not implemented)')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Checkbox(value: /*...*/, onChanged: /*...*/),
+        Checkbox(
+          value: _includeChart,
+          onChanged: (value) => setState(() => _includeChart = value!),
+        ),
         const Text('Include chart in PDF'),
         const Spacer(),
         ElevatedButton(
-          onPressed: /* export logic */,
+          onPressed: _exportToPdf,
           child: const Text('Export to PDF'),
         ),
       ],
@@ -283,35 +403,4 @@ class PnLChartData {
   double get netProfit => income - expense;
 
   PnLChartData({required this.period, required this.income, required this.expense});
-}
-
-void _applyFilters() {
-  // Filter incomes
-  _filteredIncomes = _allIncomes.where((e) {
-    final inRange = _selectedRange == null ||
-        (DateTime.parse(e.date).isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
-         DateTime.parse(e.date).isBefore(_selectedRange!.end.add(const Duration(days: 1))));
-    final categoryMatch = _selectedCategory == null || e.category == _selectedCategory;
-    final typeMatch = _selectedType == 'Income' || _selectedType == 'Both';
-    return inRange && categoryMatch && typeMatch;
-  }).toList();
-
-  // Filter expenses
-  _filteredExpenses = _allExpenses.where((e) {
-    final inRange = _selectedRange == null ||
-        (DateTime.parse(e.date).isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
-         DateTime.parse(e.date).isBefore(_selectedRange!.end.add(const Duration(days: 1))));
-    final categoryMatch = _selectedCategory == null || e.category == _selectedCategory;
-    final typeMatch = _selectedType == 'Expense' || _selectedType == 'Both';
-    return inRange && categoryMatch && typeMatch;
-  }).toList();
-
-  // Update KPIs
-  _totalIncome = _filteredIncomes.fold(0, (sum, e) => sum + e.amount);
-  _totalExpense = _filteredExpenses.fold(0, (sum, e) => sum + e.amount);
-
-  // Update categories
-  _updateAvailableCategories(_allIncomes, _allExpenses);
-
-  setState(() {});
 }
