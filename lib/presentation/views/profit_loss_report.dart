@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../models/financial_entry/financial_entry.dart';
+import 'widgets/kpi_card.dart';
 
 class ProfitLossReportScreen extends StatefulWidget {
   const ProfitLossReportScreen({super.key});
@@ -161,28 +162,6 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
   }
 }
 
-class _KpiCard extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _KpiCard({required this.title, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.headlineSmall),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _FilterRow extends StatelessWidget {
   final DateTimeRange? selectedRange;
@@ -279,9 +258,9 @@ class _KpiRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _KpiCard(title: 'Total Income', value: totalIncome.toStringAsFixed(2)),
-        _KpiCard(title: 'Total Expense', value: totalExpense.toStringAsFixed(2)),
-        _KpiCard(title: 'Net Profit', value: netProfit.toStringAsFixed(2)),
+        KpiCard(title: 'Total Income', value: totalIncome.toStringAsFixed(2)),
+        KpiCard(title: 'Total Expense', value: totalExpense.toStringAsFixed(2)),
+        KpiCard(title: 'Net Profit', value: netProfit.toStringAsFixed(2)),
       ],
     );
   }
