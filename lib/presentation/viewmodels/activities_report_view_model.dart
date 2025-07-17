@@ -40,22 +40,23 @@ class ActivitiesReportViewModel extends ChangeNotifier {
     _filteredActivities = _allActivities;
 
     if (activityType != null && activityType != 'All') {
-      _filteredActivities = _filteredActivities
-          .where((a) => a.activityType == activityType)
-          .toList();
+      _filteredActivities =
+          _filteredActivities.where((a) => a.type == activityType).toList();
     }
 
     if (dateRange != null) {
       _filteredActivities = _filteredActivities
           .where((a) =>
-              a.date.isAfter(dateRange.start) && a.date.isBefore(dateRange.end))
+              DateTime.parse(a.date).isAfter(dateRange.start) &&
+              DateTime.parse(a.date).isBefore(dateRange.end))
           .toList();
     }
 
     if (status != null && status != 'All') {
-      final isComplete = status == 'Completed';
-      _filteredActivities =
-          _filteredActivities.where((a) => a.isComplete == isComplete).toList();
+      // Assuming notes contain status information
+      _filteredActivities = _filteredActivities
+          .where((a) => a.notes?.toLowerCase().contains(status.toLowerCase()) ?? false)
+          .toList();
     }
 
     notifyListeners();

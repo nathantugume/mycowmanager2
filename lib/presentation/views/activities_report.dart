@@ -233,8 +233,10 @@ class _KpiRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<ActivitiesReportViewModel>();
     final totalActivities = vm.activities.length;
-    final completedActivities =
-        vm.activities.where((a) => a.isComplete).length;
+    // Assuming notes contain status information
+    final completedActivities = vm.activities
+        .where((a) => a.notes?.toLowerCase().contains('completed') ?? false)
+        .length;
     final pendingActivities = totalActivities - completedActivities;
 
     return Row(
@@ -253,21 +255,25 @@ class _Charts extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<ActivitiesReportViewModel>();
     final activityTypes =
-        vm.activities.map((a) => a.activityType).toSet().toList();
+        vm.activities.map((a) => a.type).toSet().toList();
     final activityTypeDistribution = activityTypes.map((type) {
       final count =
-          vm.activities.where((a) => a.activityType == type).length;
+          vm.activities.where((a) => a.type == type).length;
       return {'type': type, 'count': count};
     }).toList();
 
     final statusDistribution = [
       {
         'status': 'Completed',
-        'count': vm.activities.where((a) => a.isComplete).length
+        'count': vm.activities
+            .where((a) => a.notes?.toLowerCase().contains('completed') ?? false)
+            .length
       },
       {
         'status': 'Pending',
-        'count': vm.activities.where((a) => !a.isComplete).length
+        'count': vm.activities
+            .where((a) => a.notes?.toLowerCase().contains('pending') ?? false)
+            .length
       },
     ];
 
@@ -318,10 +324,10 @@ class _ActivitiesTable extends StatelessWidget {
       ],
       rows: vm.activities.map((activity) {
         return DataRow(cells: [
-          DataCell(Text(activity.title)),
-          DataCell(Text(activity.activityType)),
+          DataCell(Text(activity.id)),
+          DataCell(Text(activity.type)),
           DataCell(Text(activity.date.toString().split(' ')[0])),
-          DataCell(Text(activity.isComplete ? 'Completed' : 'Pending')),
+          DataCell(Text(activity.notes ?? '')),
         ]);
       }).toList(),
     );
