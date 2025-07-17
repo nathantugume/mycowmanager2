@@ -9,11 +9,13 @@ class BreedRepository{
   );
 
   Future<List<Breed>> getAll() async => _breedRepo.getAll();
-  Future<void> add(Breed b)             => _breedRepo.add(b);
+  Future<void> add(Breed b)             => _breedRepo.add(b,id: _breedRepo.generateId());
   Future<void> update(String id, Breed b)=> _breedRepo.update(id,b);
   Future<void> delete(String id)          => _breedRepo.delete(id);
   Future<Breed?> getById(String id)      => _breedRepo.getById(id);
   Future<List<Breed>> getByFarmId(String farmId)
   => _breedRepo.getByParameter('farmId', farmId);
+  String generateId() => _breedRepo.generateId();
+
 
 }

@@ -4,6 +4,7 @@ import 'breed_screen.dart';
 import 'cattle_group_screen.dart';
 import 'dashboard_screen.dart';
 import 'farm_screen.dart';
+import 'manage_users.dart';
 
 class FarmSetupScreen extends StatelessWidget{
   const FarmSetupScreen({super.key});
@@ -27,6 +28,10 @@ class FarmSetupScreen extends StatelessWidget{
         imageName: 'assets/images/users.jpeg',
         color: Colors.white,
         onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ManageUsersScreen()),
+          );
         },
       ),
       DashboardItem(

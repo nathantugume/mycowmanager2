@@ -8,10 +8,11 @@ class ImageRepository{
     toJson: (c) => c.toJson(),
   );
   Future<List<ImageModel>> getAll() async => _imageRepo.getAll();
-  Future<void> add(ImageModel c)             => _imageRepo.add(c);
+  Future<void> add(ImageModel c)             => _imageRepo.add(c,id: c.id);
   Future<void> update(String id, ImageModel c)=> _imageRepo.update(id,c);
   Future<void> delete(String id)          => _imageRepo.delete(id);
   Future<ImageModel?> getById(String id)      => _imageRepo.getById(id);
+  String generateId()=>_imageRepo.generateId();
 
 
 }

@@ -9,10 +9,12 @@ class FarmRepository{
       toJson:(f)=>f.toJson());
 
     Future<List<Farm>> getAll() async => _farmRepo.getAll();
-    Future<void> add(Farm f) => _farmRepo.add(f);
+    Future<void> add(Farm f) => _farmRepo.add(f,id: f.id);
     Future<void> update(String id, Farm f)=> _farmRepo.update(id,f);
     Future<void> delete(String id)          => _farmRepo.delete(id);
     Future<Farm?> getById(String id)      => _farmRepo.getById(id);
     Future<List<Farm>> getByUserId(String userId)
     => _farmRepo.getByParameter('owner', userId);
+
+    String generateId() => _farmRepo.generateId();
 }

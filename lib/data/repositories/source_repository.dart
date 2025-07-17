@@ -11,7 +11,7 @@ class SourceRepository{
 
     );
     Future<List<Source>> getAll() async => _sourceRepo.getAll();        // returns Future
-    Future<void> add(Source c)             => _sourceRepo.add(c);
+    Future<void> add(Source c)             => _sourceRepo.add(c,id: c.id);
     Future<void> update(String id, Source c)=> _sourceRepo.update(id,c);
     Future<void> delete(String id)          => _sourceRepo.delete(id);
     Future<Source?> getById(String id)      => _sourceRepo.getById(id);

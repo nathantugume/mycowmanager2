@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../data/repositories/expense_repository.dart';
 import '../../models/financial_entry/financial_entry.dart';
@@ -38,10 +38,15 @@ class ExpenseViewModel extends ChangeNotifier{
   //add new expense
   Future<void> add(ExpenseEntry c) async {
     try {
+      var id = _repository.generateId();
+      c = c.copyWith(id: id);
       await _repository.add(c);
       _operationStatus = 'Expense added successfully';
       notifyListeners();
     } catch (e) {
+      if (kDebugMode) {
+        print(e.toString());
+      }
       _error = e as Exception;
       notifyListeners();
     }

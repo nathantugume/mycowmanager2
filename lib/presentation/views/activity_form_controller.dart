@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:mycowmanager/models/activities/activity.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/farm/farm.dart';
 import '../viewmodels/activities_view_model.dart';
 import '../viewmodels/cattle_view_model.dart';
 import '../viewmodels/farm_view_model.dart';
@@ -20,6 +19,9 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
   late final CattleViewModel _cattleVm;
   late final ActivitiesViewModel _activityVm;
   late final FarmViewModel _farmVm;
+
+  // State
+  bool _isLoading = false;
 
   // Controllers
   final _activityTypeCtrl = TextEditingController();
@@ -48,7 +50,6 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
 
     _farmVm.loadForCurrentUser();
     _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
   }
 
   @override
@@ -126,36 +127,41 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
             onChanged: (val) => setState(() => _selectedActivityType = val),
           ),
 
-          _tf(_dateCtrl, 'Date (yyyy-MM-dd)', readOnly: true, onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              _dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
-            }
-          }),
+          _tf(
+            _dateCtrl,
+            'Date (yyyy-MM-dd)',
+            readOnly: true,
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                _dateCtrl.text = DateFormat('yyyy-MM-dd').format(picked);
+              }
+            },
+          ),
 
           _tf(_performedByCtrl, 'Performed By'),
           _tf(_notesCtrl, 'Notes'),
 
-        DropdownButtonFormField<String>(
-          decoration: const InputDecoration(
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
               border: OutlineInputBorder(),
-              labelText: 'Select Cow'),
-          value: _selectedCowId,
-          items: cattleList.map((cattle) {
-            return DropdownMenuItem(
-              value: cattle.id,
-              child: Text('${cattle.tag} - ${cattle.name}'),
-            );
-          }).toList(),
-          onChanged: (val) => setState(() => _selectedCowId = val),
-        ),
-          SizedBox(height: 10),
-
+              labelText: 'Select Cow',
+            ),
+            value: _selectedCowId,
+            items: cattleList.map((cattle) {
+              return DropdownMenuItem(
+                value: cattle.id,
+                child: Text('${cattle.tag} - ${cattle.name}'),
+              );
+            }).toList(),
+            onChanged: (val) => setState(() => _selectedCowId = val),
+          ),
+          const SizedBox(height: 10),
 
           if (_selectedActivityType?.toLowerCase() == 'disease') ...[
             _tf(_diagnosisCtrl, 'Diagnosis'),
@@ -179,57 +185,119 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
           ],
 
           const SizedBox(height: 20),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.save),
-            label: const Text('Save Activity'),
-            onPressed: _onSave,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.save),
+              label: Text(_isLoading ? 'Saving...' : 'Save Activity'),
+              onPressed: _isLoading ? null : _onSave,
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _onSave() {
+  void _onSave() async {
+    if (_isLoading) return; // Prevent multiple submissions
+
     final farm = context.read<CurrentFarm>().farm;
-    if (farm == null || _selectedCowId == null || _activityTypeCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Please fill all required fields.'),
-      ));
+    if (farm == null ||
+        _selectedCowId == null ||
+        _selectedActivityType == null ||
+        _dateCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all required fields.')),
+      );
       return;
     }
 
-    // Add your model and submit logic here
-    Activity(
-        id: '',
-        farmId: farm.id,
-        cattleId: _selectedCowId!,
-        type: _activityTypeCtrl.text.trim(),
-        date: _dateCtrl.text.trim(),
-        farmName: farm.name,
-        performedBy: _performedByCtrl.text.trim(),
-        notes: _notesCtrl.text.trim(),
-        diagnosis: _diagnosisCtrl.text.trim(),
-        symptoms: _symptomsCtrl.text.trim().isEmpty
-        ? []
-        : _symptomsCtrl.text.trim().split(',').map((s) => s.trim()).toList(),
-    medications: _medicationsCtrl.text.trim().isEmpty
-    ? []
-        : _medicationsCtrl.text.trim().split(',').map((m) => m.trim()).toList(),
-        vaccineName: _vaccineNameCtrl.text.trim(),
-        vaccineDose: _vaccineDoseCtrl.text.trim(),
-        weight: _weightCtrl.text.trim(),
-        weightUnit: _weightUnitCtrl.text.trim(),
-        breedingType: _breedingTypeCtrl.text.trim(),
-        sireTag: _sireTagCtrl.text.trim(),
-        createdOn: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+    setState(() => _isLoading = true);
+
+    // Create the activity object
+    final activity = Activity(
+      id: '',
+      farmId: farm.id,
+      cattleId: _selectedCowId!,
+      type: _selectedActivityType!,
+      date: _dateCtrl.text.trim(),
+      farmName: farm.name,
+      performedBy: _performedByCtrl.text.trim(),
+      notes: _notesCtrl.text.trim(),
+      diagnosis: _diagnosisCtrl.text.trim(),
+      symptoms: _symptomsCtrl.text.trim().isEmpty
+          ? []
+          : _symptomsCtrl.text.trim().split(',').map((s) => s.trim()).toList(),
+      medications: _medicationsCtrl.text.trim().isEmpty
+          ? []
+          : _medicationsCtrl.text
+                .trim()
+                .split(',')
+                .map((m) => m.trim())
+                .toList(),
+      vaccineName: _vaccineNameCtrl.text.trim(),
+      vaccineDose: _vaccineDoseCtrl.text.trim(),
+      weight: _weightCtrl.text.trim(),
+      weightUnit: _weightUnitCtrl.text.trim(),
+      breedingType: _breedingTypeCtrl.text.trim(),
+      sireTag: _sireTagCtrl.text.trim(),
+      createdOn: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
     );
 
+    try {
+      await _activityVm.add(activity);
 
+      if (!mounted) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
+      // Check for errors
+      if (_activityVm.error != null) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save activity: ${_activityVm.error}'),
+          ),
+        );
+        return;
+      }
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Activity saved successfully!')),
+      );
+
+      // Clear form and close modal
+      _clearForm();
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving activity: $e')));
+    }
   }
 
-  Widget _tf(TextEditingController ctrl, String label,
-      {bool readOnly = false, VoidCallback? onTap}) {
+  Widget _tf(
+    TextEditingController ctrl,
+    String label, {
+    bool readOnly = false,
+    VoidCallback? onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
@@ -244,8 +312,12 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
     );
   }
 
-  Widget _dropdown(TextEditingController ctrl, String label, List<String> options,
-      {required ValueChanged<String> onChanged}) {
+  Widget _dropdown(
+    TextEditingController ctrl,
+    String label,
+    List<String> options, {
+    required ValueChanged<String> onChanged,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: DropdownButtonFormField<String>(
@@ -254,7 +326,9 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
           labelText: label,
         ),
         value: ctrl.text.isEmpty ? null : ctrl.text,
-        items: options.map((opt) => DropdownMenuItem(value: opt, child: Text(opt))).toList(),
+        items: options
+            .map((opt) => DropdownMenuItem(value: opt, child: Text(opt)))
+            .toList(),
         onChanged: (val) {
           if (val != null) {
             ctrl.text = val;

@@ -38,6 +38,8 @@ class IncomeViewModel extends ChangeNotifier{
   //add new income
   Future<void> add(IncomeEntry c) async {
     try {
+      var id = _repository.generateId();
+      c = c.copyWith(id: id);
       await _repository.add(c);
       _operationStatus = 'Income added successfully';
       notifyListeners();

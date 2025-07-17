@@ -39,6 +39,8 @@ class BreedViewModel extends ChangeNotifier{
       _isLoading = true;
 
       try {
+        var id = _repository.generateId();
+        b = b.copyWith(id: id);
         await _repository.add(b);
         _operationStatus = 'Breed added successfully';
         notifyListeners();
@@ -55,10 +57,12 @@ class BreedViewModel extends ChangeNotifier{
     Future<void> update(String id, Breed b) async {
     _isLoading = true;
     try{
+      print(b.toString());
       await _repository.update(id, b);
       _operationStatus = 'Breed updated successfully';
       notifyListeners();
     }catch(e){
+      print(e.toString());
       _error = e as Exception;
       notifyListeners();
     }finally{

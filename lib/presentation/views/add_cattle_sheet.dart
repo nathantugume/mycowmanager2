@@ -116,40 +116,9 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-
-    if (currentFarm == null) {
-      final elapsed = DateTime.now().difference(_startTime);
-      final isTakingTooLong = elapsed > const Duration(seconds: 10);
-
-      return SizedBox(
-        height: 250,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: 12),
-              Text(isTakingTooLong
-                  ? 'Still loading farm data...'
-                  : 'Loading farm...'),
-              if (isTakingTooLong)
-                TextButton.icon(
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
-                  onPressed: () {
-                    _farmVm.loadForCurrentUser();
-                    _startTime = DateTime.now(); // reset timer
-                    _hasRetried = false;
-                  },
-                ),
-            ],
-          ),
-        ),
-      );
-    }
     
     // fetch groups once when we have a farm selected
-    if (!_groupsRequested && currentFarm != null) {
+    if (!_groupsRequested) {
       _groupsRequested = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         groupVm.getByFarmId(currentFarm.id);
@@ -222,7 +191,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                   if (newName != null && newName.isNotEmpty) {
                     final newBreed = Breed(
                       id: '', // let backend generate ID if needed
-                      farmId: currentFarm!.id,
+                      farmId: currentFarm.id,
                       name: newName.trim(),
                       createdOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
                       updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
@@ -264,7 +233,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                     final newSource = Source(
                       id: '',
                       name: newName.trim(),
-                      farmId: currentFarm!.id,
+                      farmId: currentFarm.id,
                       createdAt: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
                     );
                     await sourceVm.add(newSource);
@@ -287,60 +256,54 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
 
 
             // Group dropdown or add button
-            if (currentFarm == null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Select a farm first',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ] else ...[
-              DropdownButtonFormField<CattleGroup?>(
-                value: _selectedGroup,
-                items: [
-                  const DropdownMenuItem<CattleGroup?>(
-                    value: null,
-                    child: Text('None'),
+            ...[
+            DropdownButtonFormField<CattleGroup?>(
+              value: _selectedGroup,
+              items: [
+                const DropdownMenuItem<CattleGroup?>(
+                  value: null,
+                  child: Text('None'),
+                ),
+                ...groups.map(
+                      (g) => DropdownMenuItem(value: g, child: Text(g.name)),
+                ),
+                const DropdownMenuItem<CattleGroup?>(
+                  value: CattleGroup(
+                    id: '__add__',
+                    name: '➕ Add new group',
+                    farmId: '',
+                    farmName: '',
+                    createdOn: '',
+                    updatedOn: '',
                   ),
-                  ...groups.map(
-                        (g) => DropdownMenuItem(value: g, child: Text(g.name)),
-                  ),
-                  const DropdownMenuItem<CattleGroup?>(
-                    value: CattleGroup(
-                      id: '__add__',
-                      name: '➕ Add new group',
-                      farmId: '',
-                      farmName: '',
-                      createdOn: '',
-                      updatedOn: '',
-                    ),
-                    child: Text('➕ Add new group'),
-                  ),
-                ],
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                    labelText: 'Group'),
-                onChanged: (v) async {
-                  // Handle "Add new group"
-                  if (v?.id == '__add__') {
-                    final newName = await _showAddDialog(context, 'Group');
-                    if (newName != null && newName.trim().isNotEmpty) {
-                      final newGroup = CattleGroup(
-                        id: '',
-                        farmId: currentFarm.id,
-                        farmName: currentFarm.name,
-                        name: newName.trim(),
-                        createdOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                        updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                      );
-                      await groupVm.add(newGroup);
-                      setState(() => _selectedGroup = newGroup);
-                    }
-                  } else {
-                    setState(() => _selectedGroup = v);
+                  child: Text('➕ Add new group'),
+                ),
+              ],
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                  labelText: 'Group'),
+              onChanged: (v) async {
+                // Handle "Add new group"
+                if (v?.id == '__add__') {
+                  final newName = await _showAddDialog(context, 'Group');
+                  if (newName != null && newName.trim().isNotEmpty) {
+                    final newGroup = CattleGroup(
+                      id: '',
+                      farmId: currentFarm.id,
+                      farmName: currentFarm.name,
+                      name: newName.trim(),
+                      createdOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
+                      updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
+                    );
+                    await groupVm.add(newGroup);
+                    setState(() => _selectedGroup = newGroup);
                   }
-                },
-              ),
-            ],
+                } else {
+                  setState(() => _selectedGroup = v);
+                }
+              },
+            ),
+          ],
             SizedBox(height: 10,),
             DropdownButtonFormField<Cattle>(
               value: _selectedFather,
@@ -410,7 +373,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
 
                   final cattle = Cattle(
                     id: widget.existingCattle?.id ?? '',
-                    farmId: currentFarm!.id,
+                    farmId: currentFarm.id,
                     farmName: currentFarm.name,
                     name: _nameCtrl.text.trim(),
                     breed: _selectedBreed!,

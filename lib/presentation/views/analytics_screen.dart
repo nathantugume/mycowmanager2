@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:mycowmanager/presentation/views/cattle_report.dart';
 import 'package:mycowmanager/presentation/views/milk_report.dart';
 import 'package:provider/provider.dart';
 
@@ -65,10 +65,11 @@ class _AnalyticsScreenBody extends StatelessWidget{
         },
       ),
       DashboardItem(
-        title: 'Cattle Health Report',
+        title: 'Cattle Report',
         imageName: 'assets/images/cow.png',
         color: Colors.white,
         onTap: () {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_)=>CattleReportScreen()));
         },
       ),
       DashboardItem(
@@ -76,6 +77,7 @@ class _AnalyticsScreenBody extends StatelessWidget{
           imageName: 'assets/images/breed.png',
           color: Colors.white,
           onTap: (){
+
           }
       ),
       DashboardItem(

@@ -21,9 +21,10 @@ class FirestoreRepository<T> implements BaseRepository<T> {
   });
 
   @override
-  Future<void> add(T entity) async {
-    final id = _col.doc().id;       // auto‑generated
-    await _col.doc(id).set(entity);
+  Future<void> add(T entity,{String? id}) async {
+          // auto‑generated
+    final docId = id ?? generateId();
+    await _col.doc(docId).set(entity);
   }
   @override
   Future<void> update(String id, T entity) =>

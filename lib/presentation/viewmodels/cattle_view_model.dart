@@ -41,7 +41,12 @@ class CattleViewModel extends ChangeNotifier {
 
   // Add new cattle
   Future<void> add(Cattle c) async {
+    _isLoading = true;
+    notifyListeners();
     try {
+      var id = _repository.generateId();
+      c = c.copyWith(id: id);
+
       await _repository.add(c);
       _operationStatus = 'Cattle added successfully';
       notifyListeners();
@@ -99,6 +104,9 @@ class CattleViewModel extends ChangeNotifier {
       _singleCattle = await _repository.getById(id);
       notifyListeners();
     } catch (e) {
+      if (kDebugMode) {
+        print(e.toString());
+      }
       _error = e as Exception;
       notifyListeners();
     }

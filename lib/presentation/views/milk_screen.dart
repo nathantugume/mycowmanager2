@@ -6,16 +6,15 @@ import 'package:provider/provider.dart';
 import '../viewmodels/milk_view_model.dart';
 import 'add_milk_record_sheet.dart';
 
-class MilkScreen extends StatefulWidget{
+class MilkScreen extends StatefulWidget {
   const MilkScreen({super.key});
   @override
   State<MilkScreen> createState() => _MilkScreenState();
-
 }
 
-class _MilkScreenState extends State<MilkScreen>{
+class _MilkScreenState extends State<MilkScreen> {
   late final MilkViewModel _vm;
-  
+
   @override
   void initState() {
     super.initState();
@@ -26,53 +25,123 @@ class _MilkScreenState extends State<MilkScreen>{
 
   @override
   Widget build(BuildContext context) {
-  return ChangeNotifierProvider.value(
-    value: _vm,
-    child: Scaffold(
-      appBar: AppBar(title: const Text('Milk Records'),),
-      body: Consumer<MilkViewModel>(builder: (BuildContext context, MilkViewModel value, Widget? child) { 
-        if(value.error != null){
-          return Center(child: Text('⚠️ ${value.error}'));
-        }
-        if(value.milkList.isEmpty){
-          return const Center(child: CircularProgressIndicator());
-        }
-        
-        // show list
-        return ListView.builder(
-            itemCount: _vm.milkList.length,
-            itemBuilder: (ctx, i){
-              final milk = _vm.milkList[i];
-              return MilkCard(item: milk,
-                  onTap: () {},
-                  onMenuTap: () {},
-              );
+    return ChangeNotifierProvider.value(
+      value: _vm,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Milk Records')),
+        body: Consumer<MilkViewModel>(
+          builder: (BuildContext context, MilkViewModel value, Widget? child) {
+            if (value.error != null) {
+              return Center(child: Text('⚠️ ${value.error}'));
             }
-        );
-        
-    },),
-      floatingActionButton: FloatingActionButton.extended(
+            if (value.milkList.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // show list
+            return ListView.builder(
+              itemCount: _vm.milkList.length,
+              itemBuilder: (ctx, i) {
+                final milk = _vm.milkList[i];
+                return MilkCard(
+                  item: milk,
+                  onTap: () {},
+                  onMenuTap: () => _showMilkOptions(context, milk),
+                );
+              },
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
           label: const Text('Add Milk'),
           icon: const FaIcon(FontAwesomeIcons.plus),
           backgroundColor: Colors.blueAccent,
-          onPressed: ()=> showModalBottomSheet(context: context,
-              isScrollControlled: true,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          onPressed: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (_) => Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              builder: (_)=> Padding(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                ),
-                child: const AddMilkRecordSheet(),
+              child: const AddMilkRecordSheet(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-    )),
-    )));
-    
+  void _showMilkOptions(BuildContext context, MilkingRecord record) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit'),
+              onTap: () => Navigator.pop(ctx, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete),
+              title: const Text('Delete'),
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == 'edit') {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: AddMilkRecordSheet(initialRecord: record),
+        ),
+      );
+      if (!mounted) return;
+      _vm.getAll();
+    } else if (result == 'delete') {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete Record'),
+          content: const Text('Are you sure you want to delete this record?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirm == true) {
+        await context.read<MilkViewModel>().delete(record.id ?? '');
+        if (!mounted) return;
+        _vm.getAll();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Record deleted')));
+      }
+    }
   }
 }
 
-class MilkCard extends StatelessWidget{
+class MilkCard extends StatelessWidget {
   final MilkingRecord item;
   final VoidCallback? onTap;
   final VoidCallback? onMenuTap;
@@ -99,38 +168,37 @@ class MilkCard extends StatelessWidget{
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Expanded(child:
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _text(context, 'Farm: ${item.farmName}',isBold:true),
-                _text(context, 'Cow: ${item.cowName}'),
-                _text(context, 'Date: ${item.date}'),
-                _text(context, 'Morning : ${item.morning} | Afternoon : ${item.afternoon} | Evening : ${item.evening}'),
-                _text(context, 'Notes: ${item.notes}'),
-              ],
-            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  //   _text(context, 'Farm: ${item.farmName}',isBold:true),
+                  _text(context, 'Cow: ${item.cowName} - Tag-${item.cowId}'),
+                  _text(context, 'Date: ${item.date}'),
+                  _text(
+                    context,
+                    'Morning : ${item.morning} | Noon : ${item.afternoon} | Evening : ${item.evening}',
+                  ),
+                  _text(context, 'Total: ${item.total}'),
+                ],
+              ),
             ),
             IconButton(
               icon: const FaIcon(FontAwesomeIcons.ellipsisVertical),
               onPressed: onMenuTap,
             ),
-          ]
-
+          ],
         ),
-
-
       ),
     );
   }
-
 }
 
 Text _text(BuildContext ctx, String value, {bool isBold = false}) {
-    return Text(
-      value,
-      style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-        fontWeight: isBold ? FontWeight.bold : FontWeight.w300,
-      ),
-    );
+  return Text(
+    value,
+    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+      fontWeight: isBold ? FontWeight.bold : FontWeight.w300,
+    ),
+  );
 }

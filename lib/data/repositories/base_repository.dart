@@ -1,6 +1,6 @@
 /// Generic contract every Firestore–backed repository must satisfy.
 abstract class BaseRepository<T> {
-  Future<void> add(T entity);
+  Future<void> add(T entity,{String? id});
 
   Future<void> update(String id, T entity);
 

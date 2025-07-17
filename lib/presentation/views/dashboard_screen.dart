@@ -135,7 +135,7 @@ class DashboardScreen extends StatelessWidget {
 }
 
 extension on Type {
-  operator [](PopupMenuItem other) {}
+  void operator [](PopupMenuItem other) {}
 }
 
 /// Reusable model for each dashboard card.

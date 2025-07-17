@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +6,11 @@ import '../../models/cattle/cattle.dart';
 import '../viewmodels/cattle_view_model.dart';
 import '../viewmodels/farm_view_model.dart';
 import '../viewmodels/milk_view_model.dart';
+import 'dart:async';
 
 class AddMilkRecordSheet extends StatefulWidget {
-  const AddMilkRecordSheet({super.key});
+  final MilkingRecord? initialRecord;
+  const AddMilkRecordSheet({super.key, this.initialRecord});
 
   @override
   State<AddMilkRecordSheet> createState() => _AddMilkRecordSheetState();
@@ -23,19 +24,65 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
   final _eveningCtrl = TextEditingController();
   final _calfMilkCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final ValueNotifier<double> _totalMilkNotifier = ValueNotifier(0);
 
   String _scope = 'Entire Farm';
   Cattle? _selectedCow;
   List<Cattle> _cattleList = [];
 
+  Timer? _retryTimer;
+  bool _hasRetried = false;
+  DateTime _startTime = DateTime.now();
+
   @override
   void initState() {
     super.initState();
-    _morningCtrl.text = '0';
-    _afternoonCtrl.text = '0';
-    _eveningCtrl.text = '0';
-    _calfMilkCtrl.text = '0';
-    _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final rec = widget.initialRecord;
+    if (rec != null) {
+      _dateCtrl.text = rec.date;
+      _morningCtrl.text = rec.morning.toString();
+      _afternoonCtrl.text = rec.afternoon.toString();
+      _eveningCtrl.text = rec.evening.toString();
+      _calfMilkCtrl.text = rec.milkForCalf.toString();
+      _notesCtrl.text = rec.notes ?? '';
+      _scope = rec.cowId != null ? 'Per Cow' : 'Entire Farm';
+      // _selectedCow will be set in didChangeDependencies if needed
+    } else {
+      _morningCtrl.text = '0';
+      _afternoonCtrl.text = '0';
+      _eveningCtrl.text = '0';
+      _calfMilkCtrl.text = '0';
+      _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    }
+    _morningCtrl.addListener(_updateTotal);
+    _afternoonCtrl.addListener(_updateTotal);
+    _eveningCtrl.addListener(_updateTotal);
+    _calfMilkCtrl.addListener(_updateTotal);
+    _updateTotal();
+    _startTime = DateTime.now();
+    _startRetryWatcher();
+  }
+
+  void _startRetryWatcher() {
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final elapsed = DateTime.now().difference(_startTime);
+      final farm = context.read<CurrentFarm>().farm;
+      if (!_hasRetried &&
+          farm == null &&
+          elapsed > const Duration(seconds: 8)) {
+        _hasRetried = true;
+        context.read<FarmViewModel>().loadForCurrentUser();
+        debugPrint("⏱ Retrying loadForCurrentUser...");
+      }
+      // Optionally, stop retrying after a certain time
+      if (elapsed > const Duration(seconds: 15)) {
+        timer.cancel();
+      }
+    });
+  }
+
+  void _updateTotal() {
+    _totalMilkNotifier.value = _totalMilk;
   }
 
   @override
@@ -44,6 +91,18 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
     final farm = context.read<CurrentFarm>().farm;
     if (farm != null) {
       context.read<CattleViewModel>().getByFarmId(farm.id);
+      // If editing, set _selectedCow if needed
+      if (widget.initialRecord != null && widget.initialRecord!.cowId != null) {
+        final cattleVm = context.read<CattleViewModel>();
+        final foundList = cattleVm.cattleList.where(
+          (c) => c.tag == widget.initialRecord!.cowId,
+        );
+        if (foundList.isNotEmpty) {
+          setState(() {
+            _selectedCow = foundList.first;
+          });
+        }
+      }
     }
   }
 
@@ -60,29 +119,26 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
   void _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final farmVm = context.watch<CurrentFarm>().farm;
+    final farmVm = context.read<CurrentFarm>().farm;
     final milkVm = context.read<MilkViewModel>();
     final farm = farmVm;
 
-    if (kDebugMode) {
-      print(farm);
-    }
     if (farm == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Farm not selected')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Farm not selected')));
       return;
     }
 
     if (_scope == 'Per Cow' && _selectedCow == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a cow')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a cow')));
       return;
     }
 
     final record = MilkingRecord(
-      id: '',
+      id: widget.initialRecord?.id ?? '',
       farmName: farm.name,
       farmId: farm.id,
       owner: farm.owner,
@@ -97,17 +153,27 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
       notes: _notesCtrl.text,
     );
 
-    await milkVm.add(record);
+    if (widget.initialRecord != null &&
+        record.id != null &&
+        record.id!.isNotEmpty) {
+      await milkVm.update(record.id!, record);
+    } else {
+      await milkVm.add(record);
+    }
 
-    if (!context.mounted) return;
+    if (!mounted) return;
     Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentFarm = context.watch<CurrentFarm>().farm;
+    if (currentFarm == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final cattleVm = context.watch<CattleViewModel>();
-    _cattleList = cattleVm.cattleList; // Update cattle list from view model
-    final ifLoading = cattleVm.isLoading; // Assuming CattleViewModel has isLoading
+    _cattleList = cattleVm.cattleList;
+    final ifLoading = cattleVm.isLoading;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -119,12 +185,16 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
               DropdownButtonFormField<String>(
                 value: _scope,
                 items: const [
-                  DropdownMenuItem(value: 'Entire Farm', child: Text('Entire Farm')),
+                  DropdownMenuItem(
+                    value: 'Entire Farm',
+                    child: Text('Entire Farm'),
+                  ),
                   DropdownMenuItem(value: 'Per Cow', child: Text('Per Cow')),
                 ],
                 onChanged: (val) => setState(() {
                   _scope = val!;
-                    _selectedCow = null; // Reset selected cow when scope changes
+                  _selectedCow = null;
+                  _updateTotal();
                 }),
                 decoration: const InputDecoration(labelText: 'Scope'),
               ),
@@ -132,21 +202,24 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
                 ifLoading
                     ? const Center(child: CircularProgressIndicator())
                     : DropdownButtonFormField<Cattle>(
-                  value: _selectedCow,
-                  items: _cattleList.isEmpty
-                      ? [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('No cows available'),
-                      enabled: false,
-                    )
-                  ]
-                      : _cattleList.map((c) {
-                    return DropdownMenuItem(value: c, child: Text(c.name));
-                  }).toList(),
-                  onChanged: (c) => setState(() => _selectedCow = c),
-                  decoration: const InputDecoration(labelText: 'Cow'),
-                ),
+                        value: _selectedCow,
+                        items: _cattleList.isEmpty
+                            ? [
+                                const DropdownMenuItem(
+                                  value: null,
+                                  enabled: false,
+                                  child: Text('No cows available'),
+                                ),
+                              ]
+                            : _cattleList.map((c) {
+                                return DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c.name),
+                                );
+                              }).toList(),
+                        onChanged: (c) => setState(() => _selectedCow = c),
+                        decoration: const InputDecoration(labelText: 'Cow'),
+                      ),
               TextFormField(
                 controller: _dateCtrl,
                 readOnly: true,
@@ -167,8 +240,15 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
               _numField(_afternoonCtrl, 'Afternoon Milk (L)'),
               _numField(_eveningCtrl, 'Evening Milk (L)'),
               _numField(_calfMilkCtrl, 'Milk for Calf (L)'),
-              Text('Total Milk: ${_totalMilk.toStringAsFixed(2)} L',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              ValueListenableBuilder<double>(
+                valueListenable: _totalMilkNotifier,
+                builder: (context, total, _) {
+                  return Text(
+                    'Total Milk: ${total.toStringAsFixed(2)} L',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  );
+                },
+              ),
               TextFormField(
                 controller: _notesCtrl,
                 decoration: const InputDecoration(labelText: 'Notes'),
@@ -193,7 +273,9 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
       decoration: InputDecoration(labelText: label),
       validator: (value) {
         if (value == null || value.isEmpty) return 'Please enter a value';
-        if (double.tryParse(value) == null) return 'Please enter a valid number';
+        if (double.tryParse(value) == null) {
+          return 'Please enter a valid number';
+        }
         return null;
       },
     );
@@ -207,6 +289,8 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
     _eveningCtrl.dispose();
     _calfMilkCtrl.dispose();
     _notesCtrl.dispose();
+    _totalMilkNotifier.dispose();
+    _retryTimer?.cancel();
     super.dispose();
   }
 }

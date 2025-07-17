@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/repositories/milk_repository.dart';
 import '../../models/milk/milking_record.dart';
 
-class MilkViewModel extends ChangeNotifier{
+class MilkViewModel extends ChangeNotifier {
   final MilkRepository _repository = MilkRepository();
 
   List<MilkingRecord> _milkList = [];
@@ -27,20 +27,21 @@ class MilkViewModel extends ChangeNotifier{
       debugPrint(_error.toString());
       notifyListeners();
     }
-
   }
 
   //add new milk record
   Future<void> add(MilkingRecord c) async {
     try {
+      var id = _repository.generateId();
+      c = c.copyWith(id: id);
       await _repository.add(c);
       _operationStatus = 'Milk record added successfully';
+      debugPrint('Milk record added: ${c.toString()}');
       notifyListeners();
     } catch (e) {
       _error = e as Exception;
       notifyListeners();
     }
-
   }
 
   //update milk record
@@ -53,7 +54,6 @@ class MilkViewModel extends ChangeNotifier{
       _error = e as Exception;
       notifyListeners();
     }
-
   }
 
   //delete milk record
@@ -88,7 +88,6 @@ class MilkViewModel extends ChangeNotifier{
       _error = e as Exception;
       notifyListeners();
     }
-
   }
 
   //clear any existing status or error messages
@@ -97,6 +96,4 @@ class MilkViewModel extends ChangeNotifier{
     _error = null;
     notifyListeners();
   }
-
-
 }

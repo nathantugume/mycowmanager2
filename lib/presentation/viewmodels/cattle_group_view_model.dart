@@ -1,9 +1,7 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:mycowmanager/data/repositories/cattle_group_repository.dart';
 import 'package:mycowmanager/models/cattle_group/cattle_group.dart';
 
-import '../../data/repositories/cattle_repository.dart';
 
 class CattleGroupViewModel extends ChangeNotifier{
   final CattleGroupRepository _repository = CattleGroupRepository();
@@ -45,6 +43,8 @@ class CattleGroupViewModel extends ChangeNotifier{
     _isLoading = true;
 
     try {
+      var id = _repository.generateId();
+      g = g.copyWith(id: id);
       await _repository.add(g);
       _operationStatus = 'Group added successfully';
       notifyListeners();

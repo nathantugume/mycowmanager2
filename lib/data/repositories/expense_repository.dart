@@ -8,10 +8,12 @@ class ExpenseRepository{
     toJson: (c) => c.toJson(),
   );
   Future<List<ExpenseEntry>> getAll() async => _expenseRepo.getAll();
-  Future<void> add(ExpenseEntry c)             => _expenseRepo.add(c);
+  Future<void> add(ExpenseEntry c)             => _expenseRepo.add(c,id: c.id);
   Future<void> update(String id, ExpenseEntry c)=> _expenseRepo.update(id,c);
   Future<void> delete(String id)          => _expenseRepo.delete(id);
   Future<ExpenseEntry?> getById(String id)      => _expenseRepo.getById(id);
   Future<List<ExpenseEntry>> getByFarmId(String farmId)
   => _expenseRepo.getByParameter('farmId', farmId);
+
+  String generateId() => _expenseRepo.generateId();
 }

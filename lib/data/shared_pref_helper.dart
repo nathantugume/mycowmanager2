@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class SharedPrefHelper {
   static SharedPrefHelper? _instance;
@@ -7,7 +8,7 @@ class SharedPrefHelper {
 
   SharedPrefHelper._internal();
 
-  static Future<SharedPrefHelper> getInstance(BuildContext context) async {
+  static Future<SharedPrefHelper> getInstance([BuildContext? context]) async {
     if (_instance == null) {
       _instance = SharedPrefHelper._internal();
       _instance!._prefs = await SharedPreferences.getInstance();
@@ -64,5 +65,22 @@ class SharedPrefHelper {
 
   Future<void> remove(String key) async {
     await _prefs.remove(key);
+  }
+
+  // ────── Farm Persistence ──────
+  static const String currentFarmKey = 'current_farm';
+
+  Future<void> saveCurrentFarm(Map<String, dynamic> farmJson) async {
+    await setString(currentFarmKey, json.encode(farmJson));
+  }
+
+  Map<String, dynamic>? loadCurrentFarm() {
+    final jsonString = getString(currentFarmKey);
+    if (jsonString == null) return null;
+    try {
+      return Map<String, dynamic>.from(json.decode(jsonString));
+    } catch (_) {
+      return null;
+    }
   }
 }

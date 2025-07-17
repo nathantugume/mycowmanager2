@@ -1,11 +1,10 @@
-
 // cattle_repository.dart
 import 'package:mycowmanager/data/repositories/firestore_repository.dart';
 import 'package:mycowmanager/models/cattle/cattle.dart';
 
 // your Cattle model
 
-class CattleRepository  {
+class CattleRepository {
   // ──────────────────────────────────────────────────────────────────────────
   // Generic repo instance (points at the "cattle" collection)
   // ──────────────────────────────────────────────────────────────────────────
@@ -15,11 +14,13 @@ class CattleRepository  {
     toJson: (c) => c.toJson(),
   );
 
-  Future<List<Cattle>> getAll() async => _cattleRepo.getAll();        // returns Future
-  Future<void> add(Cattle c)             => _cattleRepo.add(c);
-  Future<void> update(String id, Cattle c)=> _cattleRepo.update(id,c);
-  Future<void> delete(String id)          => _cattleRepo.delete(id);
-  Future<Cattle?> getById(String id)      => _cattleRepo.getById(id);
-  Future<List<Cattle>> getByFarmId(String farmId)
-  => _cattleRepo.getByParameter('farmId', farmId);
+  Future<List<Cattle>> getAll() async => _cattleRepo.getAll(); // returns Future
+  Future<void> add(Cattle c) => _cattleRepo.add(c,id: c.id);
+  Future<void> update(String id, Cattle c) => _cattleRepo.update(id, c);
+  Future<void> delete(String id) => _cattleRepo.delete(id);
+  Future<Cattle?> getById(String id) => _cattleRepo.getById(id);
+  Future<List<Cattle>> getByFarmId(String farmId) =>
+      _cattleRepo.getByParameter('farmId', farmId);
+
+  String generateId() => _cattleRepo.generateId();
 }

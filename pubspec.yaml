@@ -50,12 +50,12 @@ dependencies:
   flutter_native_splash: ^2.4.6
   image_picker: ^1.1.2
   cached_network_image: ^3.4.1
-  fl_chart: ^1.0.0
   intl: ^0.20.2
   pdf: ^3.11.3
   path_provider: ^2.1.5
   printing: ^5.14.2
   shared_preferences: ^2.5.3
+  syncfusion_flutter_charts: ^30.1.40
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +89,8 @@ flutter:
     - assets/images/users.jpeg
     - assets/images/breed.png
     - assets/images/default_bg.jpeg
+    - assets/images/cow_male.png
+    - assets/images/calf.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
