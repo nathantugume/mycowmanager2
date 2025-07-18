@@ -4,6 +4,7 @@ import 'package:mycowmanager/presentation/views/activities_report.dart';
 import 'package:mycowmanager/presentation/views/cattle_report.dart';
 import 'package:mycowmanager/presentation/views/groups_report.dart';
 import 'package:mycowmanager/presentation/views/milk_report.dart';
+import 'package:mycowmanager/presentation/views/profit_loss_report.dart';
 import 'package:provider/provider.dart';
 
 import '../viewmodels/farm_view_model.dart';
@@ -95,6 +96,7 @@ class _AnalyticsScreenBody extends StatelessWidget{
           imageName: 'assets/images/business.png',
           color: Colors.white,
           onTap: (){
+            Navigator.of(context).push(MaterialPageRoute(builder: (_)=>ProfitLossReportScreen()));
           }
       ),
       DashboardItem(

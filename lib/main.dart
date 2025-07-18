@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mycowmanager/firebase_options.dart';
 import 'package:mycowmanager/presentation/viewmodels/activities_view_model.dart';
 import 'package:mycowmanager/presentation/viewmodels/breed_view_model.dart';
 import 'package:mycowmanager/presentation/viewmodels/cattle_group_view_model.dart';
@@ -23,7 +22,10 @@ import 'presentation/viewmodels/expense_view_model.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp().catchError((e) {
+    if (e.toString().contains('already exists')) return Firebase.app();
+    throw e;
+  });
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -108,7 +110,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: Consumer<AuthRepository>(
-        builder: (_, repo, __) {
+        builder: (_, repo, _) {
           return StreamBuilder<User?>(
             stream: repo.authStateChanges,
             builder: (context, snapshot) {

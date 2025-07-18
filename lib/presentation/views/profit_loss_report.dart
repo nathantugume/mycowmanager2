@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/financial_entry/financial_entry.dart';
+import '../viewmodels/income_view_model.dart';
+import '../viewmodels/expense_view_model.dart';
+import '../viewmodels/farm_view_model.dart';
 import 'widgets/kpi_card.dart';
 
 class ProfitLossReportScreen extends StatefulWidget {
@@ -30,14 +39,31 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
 
   List<PnLChartData> _chartData = [];
 
+  // For PDF export
+  final GlobalKey _chartKey = GlobalKey();
+  bool _includeChart = true;
+
   void _applyFilters() {
+    // Log all incomes and expenses before filtering
+    debugPrint('All incomes: \n');
+    for (final e in _allIncomes) {
+      debugPrint(e.toString());
+    }
+    debugPrint('All expenses: \n');
+    for (final e in _allExpenses) {
+      debugPrint(e.toString());
+    }
+
     // Filter incomes
     _filteredIncomes = _allIncomes.where((e) {
-      final inRange = _selectedRange == null ||
-          (DateTime.parse(e.date)
-                  .isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
-              DateTime.parse(e.date)
-                  .isBefore(_selectedRange!.end.add(const Duration(days: 1))));
+      final inRange =
+          _selectedRange == null ||
+          (DateTime.parse(e.date).isAfter(
+                _selectedRange!.start.subtract(const Duration(days: 1)),
+              ) &&
+              DateTime.parse(
+                e.date,
+              ).isBefore(_selectedRange!.end.add(const Duration(days: 1))));
       final categoryMatch =
           _selectedCategory == null || e.category == _selectedCategory;
       final typeMatch = _selectedType == 'Income' || _selectedType == 'Both';
@@ -46,20 +72,36 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
 
     // Filter expenses
     _filteredExpenses = _allExpenses.where((e) {
-      final inRange = _selectedRange == null ||
-          (DateTime.parse(e.date)
-                  .isAfter(_selectedRange!.start.subtract(const Duration(days: 1))) &&
-              DateTime.parse(e.date)
-                  .isBefore(_selectedRange!.end.add(const Duration(days: 1))));
+      final inRange =
+          _selectedRange == null ||
+          (DateTime.parse(e.date).isAfter(
+                _selectedRange!.start.subtract(const Duration(days: 1)),
+              ) &&
+              DateTime.parse(
+                e.date,
+              ).isBefore(_selectedRange!.end.add(const Duration(days: 1))));
       final categoryMatch =
           _selectedCategory == null || e.category == _selectedCategory;
       final typeMatch = _selectedType == 'Expense' || _selectedType == 'Both';
       return inRange && categoryMatch && typeMatch;
     }).toList();
 
+    // Log filtered lists
+    debugPrint('Filtered incomes: \n');
+    for (final e in _filteredIncomes) {
+      debugPrint(e.toString());
+    }
+    debugPrint('Filtered expenses: \n');
+    for (final e in _filteredExpenses) {
+      debugPrint(e.toString());
+    }
+
     // Update KPIs
     _totalIncome = _filteredIncomes.fold(0, (sum, e) => sum + e.amount);
     _totalExpense = _filteredExpenses.fold(0, (sum, e) => sum + e.amount);
+    debugPrint(
+      'Total income: $_totalIncome, Total expense: $_totalExpense, Net profit: $_netProfit',
+    );
 
     // Update categories
     _updateAvailableCategories();
@@ -100,10 +142,35 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
   @override
   void initState() {
     super.initState();
-    // You would typically fetch real data here
-    _allIncomes = []; // Replace with actual data fetching
-    _allExpenses = []; // Replace with actual data fetching
-    _applyFilters();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final farm = context.read<CurrentFarm>().farm;
+      if (farm != null) {
+        context.read<IncomeViewModel>().getByFarmId(farm.id).then((_) {
+          if (!mounted) return;
+          final incomes = context.read<IncomeViewModel>().incomeList;
+          debugPrint('Fetched incomes from ViewModel:');
+          for (final e in incomes) {
+            debugPrint(e.toString());
+          }
+          setState(() {
+            _allIncomes = List<IncomeEntry>.from(incomes);
+            _applyFilters();
+          });
+        });
+        context.read<ExpenseViewModel>().getByFarmId(farm.id).then((_) {
+          if (!mounted) return;
+          final expenses = context.read<ExpenseViewModel>().expenseList;
+          debugPrint('Fetched expenses from ViewModel:');
+          for (final e in expenses) {
+            debugPrint(e.toString());
+          }
+          setState(() {
+            _allExpenses = List<ExpenseEntry>.from(expenses);
+            _applyFilters();
+          });
+        });
+      }
+    });
   }
 
   @override
@@ -111,20 +178,41 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Profit & Loss Report'),
-        // Optionally show farm name/logo here
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export PDF',
+            onPressed: _exportToPdf,
+          ),
+        ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             // 1. Filter Row (date range, type, category)
             _FilterRow(
               selectedRange: _selectedRange,
-              onRangeChanged: (range) => setState(() => _selectedRange = range),
+              onRangeChanged: (range) {
+                setState(() {
+                  _selectedRange = range;
+                  _applyFilters();
+                });
+              },
               selectedType: _selectedType,
-              onTypeChanged: (type) => setState(() => _selectedType = type),
+              onTypeChanged: (type) {
+                setState(() {
+                  _selectedType = type;
+                  _applyFilters();
+                });
+              },
               selectedCategory: _selectedCategory,
-              onCategoryChanged: (cat) => setState(() => _selectedCategory = cat),
+              onCategoryChanged: (cat) {
+                setState(() {
+                  _selectedCategory = cat;
+                  _applyFilters();
+                });
+              },
               availableCategories: _availableCategories,
             ),
 
@@ -139,29 +227,105 @@ class _ProfitLossReportScreenState extends State<ProfitLossReportScreen> {
 
             const SizedBox(height: 16),
 
+            // 2.5. Include chart in PDF switch
+            SwitchListTile(
+              value: _includeChart,
+              onChanged: (value) => setState(() => _includeChart = value),
+              title: const Text('Include chart in PDF'),
+              contentPadding: EdgeInsets.zero,
+            ),
+
             // 3. Chart Section (Income/Expense/Net Profit)
-            _PnLChart(data: _chartData),
-
-            const SizedBox(height: 16),
-
-            // 4. Table Section (detailed entries)
-            Expanded(
-              child: _PnLTable(
-                entries: [..._filteredIncomes, ..._filteredExpenses]..sort((a, b) => b.date.compareTo(a.date)),
-              ),
+            RepaintBoundary(
+              key: _chartKey,
+              child: _PnLChart(data: _chartData),
             ),
 
             const SizedBox(height: 16),
 
-            // 5. Export Row (checkbox + button)
-            _ExportRow(),
+            // 4. Table Section (detailed entries)
+            _PnLTable(
+              entries: [..._filteredIncomes, ..._filteredExpenses]
+                ..sort((a, b) => b.date.compareTo(a.date)),
+            ),
+
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
-}
 
+  Future<Uint8List?> _captureChart(GlobalKey key) async {
+    try {
+      final boundary =
+          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 2);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _exportToPdf() async {
+    final chartImg = _includeChart ? await _captureChart(_chartKey) : null;
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        build: (pw.Context ctx) => [
+          pw.Text(
+            'Profit & Loss Report',
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          if (_selectedRange != null)
+            pw.Text(
+              'Date Range: ${_selectedRange!.start.toString().split(' ')[0]} - ${_selectedRange!.end.toString().split(' ')[0]}',
+            ),
+          if (_selectedType != 'Both') pw.Text('Type: $_selectedType'),
+          if (_selectedCategory != null)
+            pw.Text('Category: $_selectedCategory'),
+          pw.SizedBox(height: 16),
+          pw.Text('KPIs', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Bullet(text: 'Total Income: ${_totalIncome.toStringAsFixed(2)}'),
+          pw.Bullet(text: 'Total Expense: ${_totalExpense.toStringAsFixed(2)}'),
+          pw.Bullet(text: 'Net Profit: ${_netProfit.toStringAsFixed(2)}'),
+          pw.SizedBox(height: 16),
+          if (chartImg != null) ...[
+            pw.Text(
+              'Income/Expense/Net Profit Chart',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Image(pw.MemoryImage(chartImg), height: 200),
+            pw.SizedBox(height: 16),
+          ],
+          pw.Text(
+            'Entries',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          pw.TableHelper.fromTextArray(
+            headers: ['Date', 'Category', 'Amount', 'Type'],
+            data: [
+              for (final entry in [
+                ..._filteredIncomes,
+                ..._filteredExpenses,
+              ]..sort((a, b) => b.date.compareTo(a.date)))
+                [
+                  entry.date,
+                  entry.category,
+                  entry.amount.toStringAsFixed(2),
+                  entry is IncomeEntry ? 'Income' : 'Expense',
+                ],
+            ],
+          ),
+        ],
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (format) => pdf.save());
+  }
+}
 
 class _FilterRow extends StatelessWidget {
   final DateTimeRange? selectedRange;
@@ -184,54 +348,69 @@ class _FilterRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        // Date Range Picker
-        TextButton.icon(
-          icon: Icon(Icons.date_range),
-          label: Text(_formatRange(selectedRange)),
-          onPressed: () async {
-            final now = DateTime.now();
-            final picked = await showDateRangePicker(
-              context: context,
-              firstDate: DateTime(now.year - 5),
-              lastDate: DateTime(now.year + 1),
-              initialDateRange: selectedRange,
-            );
-            if (picked != null) onRangeChanged(picked);
-          },
-        ),
-        const SizedBox(width: 8),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          // Date Range Picker
+          TextButton.icon(
+            icon: Icon(Icons.date_range),
+            label: Text(_formatRange(selectedRange)),
+            onPressed: () async {
+              final now = DateTime.now();
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(now.year - 5),
+                lastDate: DateTime(now.year + 1),
+                initialDateRange: selectedRange,
+              );
+              if (picked != null) onRangeChanged(picked);
+            },
+          ),
+          const SizedBox(width: 8),
 
-        // Entry Type Toggle
-        ToggleButtons(
-          isSelected: [
-            selectedType == 'Income',
-            selectedType == 'Expense',
-            selectedType == 'Both',
-          ],
-          onPressed: (index) {
-            final types = ['Income', 'Expense', 'Both'];
-            onTypeChanged(types[index]);
-          },
-          children: const [
-            Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Income')),
-            Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Expense')),
-            Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('Both')),
-          ],
-        ),
-        const SizedBox(width: 8),
+          // Entry Type Toggle
+          ToggleButtons(
+            isSelected: [
+              selectedType == 'Income',
+              selectedType == 'Expense',
+              selectedType == 'Both',
+            ],
+            onPressed: (index) {
+              final types = ['Income', 'Expense', 'Both'];
+              onTypeChanged(types[index]);
+            },
+            children: const [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('Income'),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('Expense'),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('Both'),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
 
-        // Category Dropdown
-        DropdownButton<String>(
-          value: selectedCategory,
-          hint: const Text('Category'),
-          items: availableCategories
-              .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
-              .toList(),
-          onChanged: onCategoryChanged,
-        ),
-      ],
+          // Category Dropdown
+          DropdownButton<String?>(
+            value: selectedCategory,
+            hint: const Text('Category'),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('All')),
+              ...availableCategories.map(
+                (cat) => DropdownMenuItem(value: cat, child: Text(cat)),
+              ),
+            ],
+            onChanged: onCategoryChanged,
+          ),
+        ],
+      ),
     );
   }
 
@@ -255,6 +434,22 @@ class _KpiRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSmall = MediaQuery.of(context).size.width < 400;
+    if (isSmall) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          KpiCard(title: 'Total Income', value: totalIncome.toStringAsFixed(2)),
+          const SizedBox(height: 8),
+          KpiCard(
+            title: 'Total Expense',
+            value: totalExpense.toStringAsFixed(2),
+          ),
+          const SizedBox(height: 8),
+          KpiCard(title: 'Net Profit', value: netProfit.toStringAsFixed(2)),
+        ],
+      );
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -272,7 +467,7 @@ class _PnLChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 250,
       child: SfCartesianChart(
         primaryXAxis: CategoryAxis(),
@@ -316,10 +511,10 @@ class _PnLTable extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use DataTable with filtered entry data
     return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: const [
           DataColumn(label: Text('Date')),
-          DataColumn(label: Text('Title')),
           DataColumn(label: Text('Category')),
           DataColumn(label: Text('Amount')),
           DataColumn(label: Text('Type')),
@@ -328,8 +523,11 @@ class _PnLTable extends StatelessWidget {
           final isIncome = entry is IncomeEntry;
           return DataRow(
             cells: [
-              DataCell(Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(entry.date)))),
-              DataCell(Text(entry.title)),
+              DataCell(
+                Text(
+                  DateFormat('yyyy-MM-dd').format(DateTime.parse(entry.date)),
+                ),
+              ),
               DataCell(Text(entry.category)),
               DataCell(Text(entry.amount.toStringAsFixed(2))),
               DataCell(Text(isIncome ? 'Income' : 'Expense')),
@@ -341,45 +539,15 @@ class _PnLTable extends StatelessWidget {
   }
 }
 
-class _ExportRow extends StatefulWidget {
-  @override
-  State<_ExportRow> createState() => _ExportRowState();
-}
-
-class _ExportRowState extends State<_ExportRow> {
-  bool _includeChart = true;
-
-  void _exportToPdf() {
-    // TODO: Implement PDF export logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Exporting to PDF... (not implemented)')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Checkbox(
-          value: _includeChart,
-          onChanged: (value) => setState(() => _includeChart = value!),
-        ),
-        const Text('Include chart in PDF'),
-        const Spacer(),
-        ElevatedButton(
-          onPressed: _exportToPdf,
-          child: const Text('Export to PDF'),
-        ),
-      ],
-    );
-  }
-}
-
 class PnLChartData {
   final String period; // e.g., '2024-06'
   final double income;
   final double expense;
   double get netProfit => income - expense;
 
-  PnLChartData({required this.period, required this.income, required this.expense});
+  PnLChartData({
+    required this.period,
+    required this.income,
+    required this.expense,
+  });
 }

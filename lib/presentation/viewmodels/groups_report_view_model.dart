@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:mycowmanager/data/repositories/cattle_group_repository.dart';
 import 'package:mycowmanager/data/repositories/cattle_repository.dart';
 import 'package:mycowmanager/data/repositories/milk_repository.dart';
@@ -61,14 +61,18 @@ class GroupsReportViewModel extends ChangeNotifier {
 
     if (groupId != null) {
       _filteredGroups = _allGroups.where((g) => g.id == groupId).toList();
-      _filteredCattle = _allCattle.where((c) => c.groupId == groupId).toList();
+      _filteredCattle = _allCattle
+          .where((c) => c.cattleGroup == groupId)
+          .toList();
     }
 
     if (dateRange != null) {
       _filteredMilkRecords = _allMilkRecords
-          .where((r) =>
-              r.date.isAfter(dateRange.start) &&
-              r.date.isBefore(dateRange.end))
+          .where(
+            (r) =>
+                DateTime.parse(r.date).isAfter(dateRange.start) &&
+                DateTime.parse(r.date).isBefore(dateRange.end),
+          )
           .toList();
     }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:mycowmanager/data/repositories/activity_repository.dart';
 import 'package:mycowmanager/models/activities/activity.dart';
 

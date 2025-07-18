@@ -327,29 +327,147 @@ class _CattleDetailsScreenState extends State<CattleDetailsScreen> {
                   if (cattle == null) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  return ListView(
+                  return SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
-                    children: [
-                      Text(
-                        'Name: ${cattle.name}',
-                        style: const TextStyle(fontSize: 18),
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      Text('Tag: ${cattle.tag}'),
-                      Text('Breed: ${cattle.breed}'),
-                      Text('Gender: ${cattle.gender}'),
-                      Text('DOB: ${cattle.dob}'),
-                      Text('Age: ${calculateAge(cattle.dob)}'),
-                      Text(
-                        'Stage: ${getCattleStage(cattle.dob, cattle.gender)}',
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Profile image and name
+                            Center(
+                              child: Column(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 40,
+                                    backgroundColor: Colors.grey[200],
+                                    backgroundImage: AssetImage(
+                                      getCattleIcon(cattle),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    cattle.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    'Tag: ${cattle.tag}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(color: Colors.grey[700]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            // Identification Section
+                            Text(
+                              'Identification',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              leading: const Icon(Icons.pets),
+                              title: const Text('Breed'),
+                              subtitle: Text(cattle.breed),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.male),
+                              title: const Text('Gender'),
+                              subtitle: Text(cattle.gender),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.cake),
+                              title: const Text('Date of Birth'),
+                              subtitle: Text(
+                                '${cattle.dob}  (Age: ${calculateAge(cattle.dob)})',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Genetics Section
+                            Text(
+                              'Genetics',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              leading: const Icon(Icons.female),
+                              title: const Text('Mother Tag'),
+                              subtitle: Text(cattle.motherTag ?? '-'),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.male),
+                              title: const Text('Father Tag'),
+                              subtitle: Text(cattle.fatherTag ?? '-'),
+                            ),
+                            const SizedBox(height: 16),
+                            // Lifecycle Section
+                            Text(
+                              'Lifecycle',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              leading: const Icon(Icons.timeline),
+                              title: const Text('Stage'),
+                              subtitle: Text(
+                                getCattleStage(cattle.dob, cattle.gender),
+                              ),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.group_work),
+                              title: const Text('Group'),
+                              subtitle: Text(
+                                (cattle.cattleGroup ?? cattle.addGroup) ?? '',
+                              ),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.source),
+                              title: const Text('Source'),
+                              subtitle: Text(cattle.source),
+                            ),
+                            const SizedBox(height: 16),
+                            // Physical Section
+                            Text(
+                              'Physical',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              leading: const Icon(Icons.monitor_weight),
+                              title: const Text('Weight'),
+                              subtitle: Text(cattle.weight ?? '-'),
+                            ),
+                            const SizedBox(height: 16),
+                            // Status Section
+                            Text(
+                              'Status',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            ListTile(
+                              leading: const Icon(Icons.info_outline),
+                              title: const Text('Status'),
+                              subtitle: Text(cattle.status),
+                            ),
+                          ],
+                        ),
                       ),
-                      Text('Weight: ${cattle.weight ?? '-'}'),
-                      Text('Group: ${cattle.cattleGroup}'),
-                      Text('Source: ${cattle.source}'),
-                      Text('Mother Tag: ${cattle.motherTag ?? '-'}'),
-                      Text('Father Tag: ${cattle.fatherTag ?? '-'}'),
-                      Text('Status: ${cattle.status}'),
-                      // Add more fields as needed
-                    ],
+                    ),
                   );
                 },
               ),

@@ -8,8 +8,6 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import '../viewmodels/activities_view_model.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:pdf/pdf.dart';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -434,7 +432,7 @@ class _PopulationBreakdownChart extends StatelessWidget {
           'sold': colorScheme.secondary,
           'dead': colorScheme.error,
           'archived': colorScheme.outline,
-          'Unknown': colorScheme.surfaceVariant,
+          'Unknown': colorScheme.surfaceContainerHighest,
         };
         return Card(
           child: Padding(
@@ -722,8 +720,7 @@ class _AgeGroupCount {
 }
 
 class _TopProducersChart extends StatelessWidget {
-  final int topN;
-  const _TopProducersChart({this.topN = 5});
+  const _TopProducersChart();
 
   @override
   Widget build(BuildContext context) {
@@ -754,7 +751,7 @@ class _TopProducersChart extends StatelessWidget {
         final sorted = cowYield.entries.toList()
           ..sort((a, b) => b.value.compareTo(a.value));
         final data = sorted
-            .take(topN)
+            .take(5) // Changed from topN to 5
             .map((e) => _ProducerYield(e.key, e.value))
             .toList();
         final colorScheme = Theme.of(context).colorScheme;

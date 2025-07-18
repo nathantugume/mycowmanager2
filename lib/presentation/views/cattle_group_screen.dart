@@ -8,7 +8,6 @@ import '../viewmodels/cattle_group_view_model.dart';
 import '../viewmodels/farm_view_model.dart';
 import 'dart:async';
 
-import 'add_cattle_group.dart';
 
 class CattleGroupScreen extends StatefulWidget {
   const CattleGroupScreen({super.key});

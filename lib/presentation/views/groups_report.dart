@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-import 'package:mycowmanager/presentation/viewmodels/farm_view_model.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:syncfusion_flutter_charts/charts.dart';
-
 import '../viewmodels/groups_report_view_model.dart';
-import 'widgets/kpi_card.dart';
+import '../viewmodels/farm_view_model.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 
 class GroupsReportScreen extends StatelessWidget {
   const GroupsReportScreen({super.key});
@@ -23,60 +22,131 @@ class GroupsReportScreen extends StatelessWidget {
   }
 }
 
-Future<void> _exportToPdf(BuildContext context) async {
-  final pdf = pw.Document();
+class _GroupsReportScreenBody extends StatefulWidget {
+  const _GroupsReportScreenBody();
 
-  pdf.addPage(
-    pw.Page(
-      build: (pw.Context context) => pw.Column(
-        children: [
-          pw.Text('Groups Report', style: pw.TextStyle(fontSize: 24)),
+  @override
+  State<_GroupsReportScreenBody> createState() =>
+      _GroupsReportScreenBodyState();
+}
+
+class _GroupsReportScreenBodyState extends State<_GroupsReportScreenBody> {
+  String? _selectedGroup;
+  DateTimeRange? _selectedDateRange;
+  String? _selectedStatus;
+
+  // Keys for chart capture
+  final GlobalKey _populationChartKey = GlobalKey();
+  final GlobalKey _milkYieldChartKey = GlobalKey();
+
+  Future<Uint8List?> _captureChart(GlobalKey key) async {
+    try {
+      final boundary =
+          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 2);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _exportToPdf(BuildContext context) async {
+    final vm = context.read<GroupsReportViewModel>();
+    final popImg = await _captureChart(_populationChartKey);
+    final milkImg = await _captureChart(_milkYieldChartKey);
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        build: (pw.Context ctx) => [
+          pw.Text(
+            'Groups Report',
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 8),
+          if (_selectedDateRange != null)
+            pw.Text(
+              'Date Range: ${_selectedDateRange!.start.toString().split(' ')[0]} - ${_selectedDateRange!.end.toString().split(' ')[0]}',
+            ),
+          if (_selectedStatus != null) pw.Text('Status: $_selectedStatus'),
           pw.SizedBox(height: 16),
+          pw.Text(
+            'Group Population',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          if (popImg != null) pw.Image(pw.MemoryImage(popImg), height: 180),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'Milk Yield per Group',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
+          if (milkImg != null) pw.Image(pw.MemoryImage(milkImg), height: 180),
+          pw.SizedBox(height: 16),
+          pw.Text(
+            'Group Summary',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+          ),
           pw.Table.fromTextArray(
-            headers: ['Group', 'Cattle Count', 'Avg Age', 'Total Milk Yield'],
-            data: const [
-              ['Group A', '10', '2.5', '100'],
-              ['Group B', '15', '3.2', '150'],
-              ['Group C', '8', '1.8', '80'],
+            headers: [
+              'Group',
+              'Cattle Count',
+              'Avg Age (yrs)',
+              'Total Milk (L)',
+            ],
+            data: [
+              for (final group in vm.groups)
+                () {
+                  final cattleInGroup = vm.cattle
+                      .where((c) => c.cattleGroup == group.id)
+                      .toList();
+                  final cattleTagsInGroup = cattleInGroup
+                      .map((c) => c.tag)
+                      .toList();
+                  final cattleCount = cattleInGroup.length;
+                  final avgAge = cattleInGroup.isEmpty
+                      ? 0
+                      : cattleInGroup
+                                .map((c) {
+                                  try {
+                                    return DateTime.now()
+                                        .difference(DateTime.parse(c.dob))
+                                        .inDays;
+                                  } catch (_) {
+                                    return 0;
+                                  }
+                                })
+                                .reduce((a, b) => a + b) /
+                            cattleCount /
+                            365;
+                  final totalMilk = vm.milkRecords
+                      .where((r) => cattleTagsInGroup.contains(r.cowId))
+                      .map((r) => r.total)
+                      .fold(0.0, (a, b) => a + b);
+                  return [
+                    group.name,
+                    cattleCount.toString(),
+                    avgAge.toStringAsFixed(1),
+                    totalMilk.toStringAsFixed(1),
+                  ];
+                }(),
             ],
           ),
         ],
       ),
-    ),
-  );
-
-  await Printing.layoutPdf(
-    onLayout: (format) async => pdf.save(),
-  );
-}
-
-class _GroupsReportScreenBody extends StatelessWidget {
-  const _GroupsReportScreenBody();
+    );
+    await Printing.layoutPdf(onLayout: (format) => pdf.save());
+  }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<GroupsReportViewModel>();
 
     if (vm.isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Groups Report'),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     if (vm.error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Groups Report'),
-        ),
-        body: Center(
-          child: Text(vm.error!),
-        ),
-      );
+      return Scaffold(body: Center(child: Text(vm.error!)));
     }
 
     return Scaffold(
@@ -85,258 +155,281 @@ class _GroupsReportScreenBody extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export PDF',
             onPressed: () => _exportToPdf(context),
           ),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // 1. Filter Row (group selection, date range, cattle status)
-            _FilterRow(),
-
-            const SizedBox(height: 16),
-
-            // 2. KPI Row (cattle count, avg age, total milk yield)
-            _KpiRow(),
-
-            const SizedBox(height: 16),
-
-            // 3. Charts (group population distribution, milk yield per group)
-            _Charts(),
-
-            const SizedBox(height: 16),
-
-            // 4. Table (detailed entries)
-            Expanded(child: _GroupsTable()),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterRow extends StatefulWidget {
-  @override
-  State<_FilterRow> createState() => _FilterRowState();
-}
-
-class _FilterRowState extends State<_FilterRow> {
-  String? _selectedGroup;
-  DateTimeRange? _selectedDateRange;
-  String? _selectedStatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<GroupsReportViewModel>();
-    return Row(
-      children: [
-        // Group selection
-        DropdownButton<String>(
-          value: _selectedGroup,
-          hint: const Text('Select Group'),
-          items: vm.groups.map((group) {
-            return DropdownMenuItem(
-              value: group.id,
-              child: Text(group.name),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedGroup = value;
-            });
-            context.read<GroupsReportViewModel>().applyFilters(
-                  groupId: _selectedGroup,
-                  dateRange: _selectedDateRange,
-                  status: _selectedStatus,
-                );
-          },
-        ),
-
-        const SizedBox(width: 16),
-
-        // Date range picker
-        TextButton.icon(
-          icon: const Icon(Icons.date_range),
-          label: Text(
-            _selectedDateRange == null
-                ? 'Select Date Range'
-                : '${_selectedDateRange!.start.toString().split(' ')[0]} - ${_selectedDateRange!.end.toString().split(' ')[0]}',
-          ),
-          onPressed: () async {
-            final picked = await showDateRangePicker(
-              context: context,
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
-            );
-            if (picked != null) {
-              setState(() {
-                _selectedDateRange = picked;
-              });
-              context.read<GroupsReportViewModel>().applyFilters(
-                    groupId: _selectedGroup,
-                    dateRange: _selectedDateRange,
-                    status: _selectedStatus,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Responsive Filters
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // Group filter
+                    DropdownButton<String>(
+                      value: _selectedGroup,
+                      hint: const Text('Group'),
+                      items: vm.groups
+                          .map(
+                            (g) => DropdownMenuItem(
+                              value: g.id,
+                              child: Text(g.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() => _selectedGroup = val);
+                        vm.applyFilters(
+                          groupId: val,
+                          dateRange: _selectedDateRange,
+                          status: _selectedStatus,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    // Date range filter
+                    TextButton.icon(
+                      icon: const Icon(Icons.date_range),
+                      label: Text(
+                        _selectedDateRange == null
+                            ? 'Date Range'
+                            : '${_selectedDateRange!.start.toString().split(' ')[0]} - ${_selectedDateRange!.end.toString().split(' ')[0]}',
+                      ),
+                      onPressed: () async {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDateRange = picked);
+                          vm.applyFilters(
+                            groupId: _selectedGroup,
+                            dateRange: picked,
+                            status: _selectedStatus,
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    // Status filter
+                    DropdownButton<String>(
+                      value: _selectedStatus,
+                      hint: const Text('Status'),
+                      items: const [
+                        DropdownMenuItem(value: 'All', child: Text('All')),
+                        DropdownMenuItem(
+                          value: 'Active',
+                          child: Text('Active'),
+                        ),
+                        DropdownMenuItem(value: 'Sold', child: Text('Sold')),
+                        DropdownMenuItem(value: 'Dead', child: Text('Dead')),
+                        DropdownMenuItem(
+                          value: 'Archived',
+                          child: Text('Archived'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        setState(() => _selectedStatus = val);
+                        vm.applyFilters(
+                          groupId: _selectedGroup,
+                          dateRange: _selectedDateRange,
+                          status: val,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Charts
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 700;
+                  final vm = context.watch<GroupsReportViewModel>();
+                  // Prepare data
+                  final groupPopulation = vm.groups.map((group) {
+                    final population = vm.cattle
+                        .where((c) => c.cattleGroup == group.id)
+                        .length;
+                    return {'group': group.name, 'population': population};
+                  }).toList();
+                  final milkYieldPerGroup = vm.groups.map((group) {
+                    final groupCattleTags = vm.cattle
+                        .where((c) => c.cattleGroup == group.id)
+                        .map((c) => c.tag)
+                        .toList();
+                    final groupMilkRecords = vm.milkRecords
+                        .where((r) => groupCattleTags.contains(r.cowId))
+                        .toList();
+                    final yield = groupMilkRecords
+                        .map((r) => r.total)
+                        .fold(0.0, (a, b) => a + b);
+                    return {'group': group.name, 'yield': yield};
+                  }).toList();
+                  final chartChildren = [
+                    Expanded(
+                      child: RepaintBoundary(
+                        key: _populationChartKey,
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: SfCartesianChart(
+                              title: ChartTitle(text: 'Group Population'),
+                              primaryXAxis: CategoryAxis(),
+                              series: [
+                                ColumnSeries<Map<String, dynamic>, String>(
+                                  dataSource: groupPopulation,
+                                  xValueMapper: (data, _) =>
+                                      data['group'] as String,
+                                  yValueMapper: (data, _) =>
+                                      data['population'] as int,
+                                  dataLabelSettings: const DataLabelSettings(
+                                    isVisible: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: RepaintBoundary(
+                        key: _milkYieldChartKey,
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: SfCircularChart(
+                              title: ChartTitle(text: 'Milk Yield per Group'),
+                              legend: Legend(
+                                isVisible: true,
+                                position: LegendPosition.right,
+                              ),
+                              series: <PieSeries<Map<String, dynamic>, String>>[
+                                PieSeries<Map<String, dynamic>, String>(
+                                  dataSource: milkYieldPerGroup,
+                                  xValueMapper: (data, _) =>
+                                      data['group'] as String,
+                                  yValueMapper: (data, _) =>
+                                      data['yield'] as double,
+                                  dataLabelMapper: (data, _) =>
+                                      (data['yield'] as double).toStringAsFixed(
+                                        1,
+                                      ),
+                                  dataLabelSettings: const DataLabelSettings(
+                                    isVisible: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ];
+                  return isWide
+                      ? Row(children: chartChildren)
+                      : Column(
+                          children: chartChildren
+                              .map(
+                                (w) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 16.0),
+                                  child: w,
+                                ),
+                              )
+                              .toList(),
+                        );
+                },
+              ),
+              const SizedBox(height: 24),
+              // Table header
+              Row(
+                children: const [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      'Group Name',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Cattle Count',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Avg Age (yrs)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Total Milk (L)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(),
+              // Table rows
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: vm.groups.length,
+                itemBuilder: (context, idx) {
+                  final group = vm.groups[idx];
+                  final cattleInGroup = vm.cattle
+                      .where((c) => c.cattleGroup == group.id)
+                      .toList();
+                  final cattleTagsInGroup = cattleInGroup
+                      .map((c) => c.tag)
+                      .toList();
+                  final cattleCount = cattleInGroup.length;
+                  final avgAge = cattleInGroup.isEmpty
+                      ? 0
+                      : cattleInGroup
+                                .map((c) {
+                                  try {
+                                    return DateTime.now()
+                                        .difference(DateTime.parse(c.dob))
+                                        .inDays;
+                                  } catch (_) {
+                                    return 0;
+                                  }
+                                })
+                                .reduce((a, b) => a + b) /
+                            cattleCount /
+                            365;
+                  final totalMilk = vm.milkRecords
+                      .where((r) => cattleTagsInGroup.contains(r.cowId))
+                      .map((r) => r.total)
+                      .fold(0.0, (a, b) => a + b);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: Text(group.name)),
+                        Expanded(child: Text(cattleCount.toString())),
+                        Expanded(child: Text(avgAge.toStringAsFixed(1))),
+                        Expanded(child: Text(totalMilk.toStringAsFixed(1))),
+                      ],
+                    ),
                   );
-            }
-          },
-        ),
-
-        const SizedBox(width: 16),
-
-        // Cattle status
-        DropdownButton<String>(
-          value: _selectedStatus,
-          hint: const Text('Select Status'),
-          items: const [
-            DropdownMenuItem(
-              value: 'All',
-              child: Text('All'),
-            ),
-            DropdownMenuItem(
-              value: 'Active',
-              child: Text('Active'),
-            ),
-            DropdownMenuItem(
-              value: 'Sold',
-              child: Text('Sold'),
-            ),
-          ],
-          onChanged: (value) {
-            setState(() {
-              _selectedStatus = value;
-            });
-            context.read<GroupsReportViewModel>().applyFilters(
-                  groupId: _selectedGroup,
-                  dateRange: _selectedDateRange,
-                  status: _selectedStatus,
-                );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _KpiRow extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<GroupsReportViewModel>();
-    final cattleCount = vm.cattle.length;
-    final avgAge = vm.cattle.isEmpty
-        ? 0
-        : vm.cattle
-                .map((c) => DateTime.now().difference(c.dateOfBirth).inDays)
-                .reduce((a, b) => a + b) /
-            cattleCount /
-            365;
-    final totalMilkYield = vm.milkRecords.isEmpty
-        ? 0
-        : vm.milkRecords.map((r) => r.litres).reduce((a, b) => a + b);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        KpiCard(title: 'Cattle Count', value: cattleCount.toString()),
-        KpiCard(title: 'Avg Age', value: avgAge.toStringAsFixed(1)),
-        KpiCard(
-            title: 'Total Milk Yield', value: totalMilkYield.toStringAsFixed(1)),
-      ],
-    );
-  }
-}
-
-class _Charts extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<GroupsReportViewModel>();
-    final groupPopulation = vm.groups.map((group) {
-      final population =
-          vm.cattle.where((c) => c.groupId == group.id).length;
-      return {'group': group.name, 'population': population};
-    }).toList();
-
-    final milkYieldPerGroup = vm.groups.map((group) {
-      final groupCattleIds = vm.cattle
-          .where((c) => c.groupId == group.id)
-          .map((c) => c.id)
-          .toList();
-      final yield = vm.milkRecords
-          .where((r) => groupCattleIds.contains(r.cattleId))
-          .map((r) => r.litres)
-          .fold(0.0, (a, b) => a + b);
-      return {'group': group.name, 'yield': yield};
-    }).toList();
-
-    return Expanded(
-      child: Row(
-        children: [
-          Expanded(
-            child: SfCartesianChart(
-              primaryXAxis: const CategoryAxis(),
-              title: const ChartTitle(text: 'Group Population'),
-              series: <CartesianSeries>[
-                ColumnSeries<Map<String, dynamic>, String>(
-                  dataSource: groupPopulation,
-                  xValueMapper: (Map<String, dynamic> data, _) => data['group'],
-                  yValueMapper: (Map<String, dynamic> data, _) =>
-                      data['population'],
-                )
-              ],
-            ),
+                },
+              ),
+            ],
           ),
-          Expanded(
-            child: SfCircularChart(
-              title: const ChartTitle(text: 'Milk Yield per Group'),
-              series: <CircularSeries>[
-                PieSeries<Map<String, dynamic>, String>(
-                  dataSource: milkYieldPerGroup,
-                  xValueMapper: (Map<String, dynamic> data, _) => data['group'],
-                  yValueMapper: (Map<String, dynamic> data, _) => data['yield'],
-                )
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
-    );
-  }
-}
-
-class _GroupsTable extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<GroupsReportViewModel>();
-    return DataTable(
-      columns: const [
-        DataColumn(label: Text('Group')),
-        DataColumn(label: Text('Cattle Count')),
-        DataColumn(label: Text('Avg Age')),
-        DataColumn(label: Text('Total Milk Yield')),
-      ],
-      rows: vm.groups.map((group) {
-        final cattleInGroup =
-            vm.cattle.where((c) => c.groupId == group.id).toList();
-        final cattleCount = cattleInGroup.length;
-        final avgAge = cattleInGroup.isEmpty
-            ? 0
-            : cattleInGroup
-                    .map((c) => DateTime.now().difference(c.dateOfBirth).inDays)
-                    .reduce((a, b) => a + b) /
-                cattleCount /
-                365;
-        final totalMilkYield = vm.milkRecords
-            .where((r) => cattleInGroup.any((c) => c.id == r.cattleId))
-            .map((r) => r.litres)
-            .fold(0.0, (a, b) => a + b);
-        return DataRow(cells: [
-          DataCell(Text(group.name)),
-          DataCell(Text(cattleCount.toString())),
-          DataCell(Text(avgAge.toStringAsFixed(1))),
-          DataCell(Text(totalMilkYield.toStringAsFixed(1))),
-        ]);
-      }).toList(),
     );
   }
 }
