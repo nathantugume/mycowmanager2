@@ -3,9 +3,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/milk/milking_record.dart';
 import '../../models/cattle/cattle.dart';
+import '../../models/cattle_group/cattle_group.dart';
 import '../viewmodels/cattle_view_model.dart';
 import '../viewmodels/farm_view_model.dart';
 import '../viewmodels/milk_view_model.dart';
+import '../viewmodels/cattle_group_view_model.dart';
 import 'dart:async';
 
 class AddMilkRecordSheet extends StatefulWidget {
@@ -137,6 +139,18 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
       return;
     }
 
+    // Get group info if per cow
+    String? groupId;
+    String? groupName;
+    if (_scope == 'Per Cow' && _selectedCow != null) {
+      groupId = _selectedCow!.cattleGroup; // should be the group ID
+      final groupVm = context.read<CattleGroupViewModel>();
+      final groupList = groupVm.cattleList
+          .where((g) => g.id == groupId)
+          .toList();
+      groupName = groupList.isNotEmpty ? groupList.first.name : null;
+    }
+
     final record = MilkingRecord(
       id: widget.initialRecord?.id ?? '',
       farmName: farm.name,
@@ -144,6 +158,8 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
       owner: farm.owner,
       cowId: _scope == 'Per Cow' ? _selectedCow?.tag : null,
       cowName: _scope == 'Per Cow' ? _selectedCow?.name : null,
+      cattleGroupId: groupId,
+      cattleGroupName: groupName,
       date: _dateCtrl.text,
       morning: _parse(_morningCtrl.text),
       afternoon: _parse(_afternoonCtrl.text),
@@ -151,6 +167,7 @@ class _AddMilkRecordSheetState extends State<AddMilkRecordSheet> {
       milkForCalf: _parse(_calfMilkCtrl.text),
       total: _totalMilk,
       notes: _notesCtrl.text,
+      scope: _scope, // Always set scope to a non-null value
     );
 
     if (widget.initialRecord != null &&

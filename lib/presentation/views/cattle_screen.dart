@@ -10,6 +10,8 @@ import 'package:mycowmanager/models/cattle/cattle.dart';
 import '../viewmodels/cattle_view_model.dart';
 import '../viewmodels/activities_view_model.dart';
 import 'add_cattle_sheet.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class CattleScreen extends StatefulWidget {
   const CattleScreen({super.key});
@@ -20,13 +22,29 @@ class CattleScreen extends StatefulWidget {
 
 class _CattleScreenState extends State<CattleScreen> {
   late final CattleViewModel _vm;
+  String? _filterBreed;
+  String? _filterGender;
+  String? _filterGroup;
+  String? _filterStatus;
+  String? _filterStage;
+  bool _isRefreshing = false;
+  bool _isExporting = false;
 
   @override
   void initState() {
     super.initState();
     _vm = CattleViewModel();
-    // kick off the fetch once
-    _vm.getAll(); // or fetchAll() if you renamed it
+    _vm.getAll();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _filterBreed = null;
+      _filterGender = null;
+      _filterGroup = null;
+      _filterStatus = null;
+      _filterStage = null;
+    });
   }
 
   @override
@@ -41,71 +59,346 @@ class _CattleScreenState extends State<CattleScreen> {
       value: _vm,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Manage Cattle', style: TextStyle(color: Colors.white)),
+          title: Text('Cattle', style: TextStyle(color: Colors.white)),
           backgroundColor: Colors.blueAccent,
-        ),
-        body: Consumer<CattleViewModel>(
-          builder: (context, vm, _) {
-            // 1️⃣ handle error
-            if (vm.error != null) {
-              return Center(child: Text('⚠️ ${vm.error}'));
-            }
-
-            // 2️⃣ loading indicator
-            if (vm.cattleList.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            // 3️⃣ show list
-            return ListView.builder(
-              itemCount: vm.cattleList.length,
-              itemBuilder: (ctx, i) {
-                final cattle = vm.cattleList[i];
-                return CattleCard(
-                  item: cattle,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            CattleDetailsScreen(cattleId: cattle.id),
-                      ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: () async {
+                setState(() {
+                  _isRefreshing = true;
+                  _resetFilters();
+                });
+                await _vm.getAll();
+                if (mounted) setState(() => _isRefreshing = false);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              tooltip: 'Filter',
+              onPressed: () async {
+                final vm = context.read<CattleViewModel>();
+                final cattleList = vm.cattleList;
+                final breeds = cattleList.map((c) => c.breed).toSet().toList();
+                final genders = cattleList
+                    .map((c) => c.gender)
+                    .toSet()
+                    .toList();
+                final groups = cattleList
+                    .map((c) => c.cattleGroup)
+                    .toSet()
+                    .toList();
+                final statuses = cattleList
+                    .map((c) => c.status)
+                    .toSet()
+                    .toList();
+                final stages = [
+                  'Calf',
+                  'Weaner',
+                  'Heifer',
+                  'Cow',
+                  'Bull Calf',
+                  'Bull',
+                ];
+                String? selectedBreed = _filterBreed;
+                String? selectedGender = _filterGender;
+                String? selectedGroup = _filterGroup;
+                String? selectedStatus = _filterStatus;
+                String? selectedStage = _filterStage;
+                await showModalBottomSheet(
+                  context: context,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (ctx) {
+                    return StatefulBuilder(
+                      builder: (context, setModalState) {
+                        return Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                DropdownButtonFormField<String?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Breed',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  value: selectedBreed,
+                                  items:
+                                      [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All'),
+                                        ),
+                                      ] +
+                                      breeds
+                                          .map(
+                                            (b) => DropdownMenuItem<String?>(
+                                              value: b,
+                                              child: Text(b),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (val) =>
+                                      setModalState(() => selectedBreed = val),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Gender',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  value: selectedGender,
+                                  items:
+                                      [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All'),
+                                        ),
+                                      ] +
+                                      genders
+                                          .map(
+                                            (g) => DropdownMenuItem<String?>(
+                                              value: g,
+                                              child: Text(g),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (val) =>
+                                      setModalState(() => selectedGender = val),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Group',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  value: selectedGroup,
+                                  items:
+                                      [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All'),
+                                        ),
+                                      ] +
+                                      groups
+                                          .map(
+                                            (g) => DropdownMenuItem<String?>(
+                                              value: g,
+                                              child: Text(g),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (val) =>
+                                      setModalState(() => selectedGroup = val),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Status',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  value: selectedStatus,
+                                  items:
+                                      [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All'),
+                                        ),
+                                      ] +
+                                      statuses
+                                          .map(
+                                            (s) => DropdownMenuItem<String?>(
+                                              value: s,
+                                              child: Text(s),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (val) =>
+                                      setModalState(() => selectedStatus = val),
+                                ),
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String?>(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Cattle Stage',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  value: selectedStage,
+                                  items:
+                                      [
+                                        const DropdownMenuItem<String?>(
+                                          value: null,
+                                          child: Text('All'),
+                                        ),
+                                      ] +
+                                      stages
+                                          .map(
+                                            (s) => DropdownMenuItem<String?>(
+                                              value: s,
+                                              child: Text(s),
+                                            ),
+                                          )
+                                          .toList(),
+                                  onChanged: (val) =>
+                                      setModalState(() => selectedStage = val),
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                      },
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _filterBreed = selectedBreed;
+                                          _filterGender = selectedGender;
+                                          _filterGroup = selectedGroup;
+                                          _filterStatus = selectedStatus;
+                                          _filterStage = selectedStage;
+                                        });
+                                        Navigator.pop(ctx);
+                                      },
+                                      child: const Text('Apply'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
-                  onMenuTap: () async {
-                    final option = await showModalBottomSheet<String>(
-                      context: context,
-                      shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                      ),
-                      builder: (_) => Column(
-                        mainAxisSize: MainAxisSize.min,
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              tooltip: 'Export to PDF',
+              onPressed: () async {
+                setState(() => _isExporting = true);
+                final vm = context.read<CattleViewModel>();
+                final filteredList = vm.cattleList.where((cattle) {
+                  final matchesBreed =
+                      _filterBreed == null || cattle.breed == _filterBreed;
+                  final matchesGender =
+                      _filterGender == null || cattle.gender == _filterGender;
+                  final matchesGroup =
+                      _filterGroup == null ||
+                      cattle.cattleGroup == _filterGroup;
+                  final matchesStatus =
+                      _filterStatus == null || cattle.status == _filterStatus;
+                  final matchesStage =
+                      _filterStage == null ||
+                      getCattleStage(cattle.dob, cattle.gender) == _filterStage;
+                  return matchesBreed &&
+                      matchesGender &&
+                      matchesGroup &&
+                      matchesStatus &&
+                      matchesStage;
+                }).toList();
+                final pdf = pw.Document();
+                pdf.addPage(
+                  pw.Page(
+                    build: (pw.Context context) {
+                      return pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          ListTile(
-                            leading: const Icon(Icons.visibility),
-                            title: const Text('View'),
-                            onTap: () => Navigator.pop(context, 'view'),
+                          pw.Text(
+                            'Cattle List',
+                            style: pw.TextStyle(
+                              fontSize: 24,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
-                          ListTile(
-                            leading: const Icon(Icons.edit),
-                            title: const Text('Edit'),
-                            onTap: () => Navigator.pop(context, 'edit'),
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.delete),
-                            title: const Text('Delete'),
-                            onTap: () => Navigator.pop(context, 'delete'),
+                          pw.SizedBox(height: 16),
+                          pw.Table.fromTextArray(
+                            headers: [
+                              'Tag',
+                              'Name',
+                              'Breed',
+                              'Gender',
+                              'Group',
+                              'Status',
+                              'Stage',
+                            ],
+                            data: filteredList
+                                .map(
+                                  (c) => [
+                                    c.tag,
+                                    c.name,
+                                    c.breed,
+                                    c.gender,
+                                    c.cattleGroup,
+                                    c.status,
+                                    getCattleStage(c.dob, c.gender),
+                                  ],
+                                )
+                                .toList(),
                           ),
                         ],
-                      ),
-                    );
+                      );
+                    },
+                  ),
+                );
+                await Printing.layoutPdf(
+                  onLayout: (format) async => pdf.save(),
+                );
+                if (mounted) setState(() => _isExporting = false);
+              },
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Consumer<CattleViewModel>(
+              builder: (context, vm, _) {
+                final filteredList = vm.cattleList.where((cattle) {
+                  final matchesBreed =
+                      _filterBreed == null || cattle.breed == _filterBreed;
+                  final matchesGender =
+                      _filterGender == null || cattle.gender == _filterGender;
+                  final matchesGroup =
+                      _filterGroup == null ||
+                      cattle.cattleGroup == _filterGroup;
+                  final matchesStatus =
+                      _filterStatus == null || cattle.status == _filterStatus;
+                  final matchesStage =
+                      _filterStage == null ||
+                      getCattleStage(cattle.dob, cattle.gender) == _filterStage;
+                  return matchesBreed &&
+                      matchesGender &&
+                      matchesGroup &&
+                      matchesStatus &&
+                      matchesStage;
+                }).toList();
+                // 1️⃣ handle error
+                if (vm.error != null) {
+                  return Center(child: Text('⚠️ ${vm.error}'));
+                }
 
-                    // Handle selected option
-                    if (!context.mounted) return;
-                    switch (option) {
-                      case 'view':
+                // 2️⃣ loading indicator
+                if (vm.cattleList.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                // 3️⃣ show list
+                return ListView.builder(
+                  itemCount: filteredList.length,
+                  itemBuilder: (ctx, i) {
+                    final cattle = filteredList[i];
+                    return CattleCard(
+                      item: cattle,
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -113,57 +406,106 @@ class _CattleScreenState extends State<CattleScreen> {
                                 CattleDetailsScreen(cattleId: cattle.id),
                           ),
                         );
-                        break;
-                      case 'edit':
-                        showModalBottomSheet(
-                          isScrollControlled: true,
-                          useSafeArea: true,
+                      },
+                      onMenuTap: () async {
+                        final option = await showModalBottomSheet<String>(
+                          context: context,
                           shape: const RoundedRectangleBorder(
                             borderRadius: BorderRadius.vertical(
                               top: Radius.circular(16),
                             ),
                           ),
-                          builder: (_) =>
-                              AddCattleSheet(existingCattle: cattle),
-                          context: context,
-                        );
-                        break;
-                      case 'delete':
-                        final confirmed = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Delete Cattle'),
-                            content: Text(
-                              'Are you sure you want to delete ${cattle.name}?',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel'),
+                          builder: (_) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                leading: const Icon(Icons.visibility),
+                                title: const Text('View'),
+                                onTap: () => Navigator.pop(context, 'view'),
                               ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Delete'),
+                              ListTile(
+                                leading: const Icon(Icons.edit),
+                                title: const Text('Edit'),
+                                onTap: () => Navigator.pop(context, 'edit'),
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.delete),
+                                title: const Text('Delete'),
+                                onTap: () => Navigator.pop(context, 'delete'),
                               ),
                             ],
                           ),
                         );
 
-                        if (confirmed == true) {
-                          if (!context.mounted) return;
+                        // Handle selected option
+                        if (!context.mounted) return;
+                        switch (option) {
+                          case 'view':
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    CattleDetailsScreen(cattleId: cattle.id),
+                              ),
+                            );
+                            break;
+                          case 'edit':
+                            showModalBottomSheet(
+                              isScrollControlled: true,
+                              useSafeArea: true,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(16),
+                                ),
+                              ),
+                              builder: (_) =>
+                                  AddCattleSheet(existingCattle: cattle),
+                              context: context,
+                            );
+                            break;
+                          case 'delete':
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('Delete Cattle'),
+                                content: Text(
+                                  'Are you sure you want to delete ${cattle.name}?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
 
-                          context.read<CattleViewModel>().delete(cattle.id);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Deleted')),
-                          );
+                            if (confirmed == true) {
+                              if (!context.mounted) return;
+
+                              context.read<CattleViewModel>().delete(cattle.id);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Deleted')),
+                              );
+                            }
+                            break;
                         }
-                        break;
-                    }
+                      },
+                    );
                   },
                 );
               },
-            );
-          },
+            ),
+            if (_isRefreshing || _isExporting)
+              Container(
+                color: Colors.black.withOpacity(0.2),
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+          ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: Colors.blueAccent,

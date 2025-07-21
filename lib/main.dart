@@ -91,7 +91,7 @@ class MyApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           backgroundColor: seed,
           foregroundColor: Colors.white,
-          centerTitle: true,
+          centerTitle: false,
         ),
         tabBarTheme: const TabBarThemeData(
           labelColor: Colors.white,

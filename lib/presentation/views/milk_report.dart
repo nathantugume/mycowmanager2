@@ -185,32 +185,41 @@ class _MilkReportBody extends StatelessWidget {
                     vm.exportAsPdf(context, farmName);
                   },
                 ),
-                PopupMenuButton<MilkFilter>(
-                  onSelected: (f) =>
-                      vm.setFilter(f, farmId), // 🔹 just use farmId
-                  itemBuilder: (_) => MilkFilter.values
-                      .map((f) => PopupMenuItem(value: f, child: Text(f.label)))
-                      .toList(),
-                  icon: Row(
-                    children: [
-                      Text(
-                        vm.filter.label,
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const Icon(Icons.filter_list),
-                    ],
-                  ),
-                ),
+                // Removed PopupMenuButton for filter
               ],
-              bottom: const TabBar(
-                tabs: [
-                  Tab(text: 'Table'),
-                  Tab(text: 'Bar'),
-                  Tab(text: 'Trend'),
-                ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(80),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: MilkFilter.values.map((f) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4.0,
+                            ),
+                            child: ChoiceChip(
+                              label: Text(f.label),
+                              selected: vm.filter == f,
+                              onSelected: (selected) {
+                                if (selected) vm.setFilter(f, farmId);
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const TabBar(
+                      tabs: [
+                        Tab(text: 'Table'),
+                        Tab(text: 'Bar'),
+                        Tab(text: 'Trend'),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             body: vm.isLoading

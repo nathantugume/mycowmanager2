@@ -17,7 +17,8 @@ sealed class MilkingRecord with _$MilkingRecord {
     // Cow info
     String? cowId,
     String? cowName,
-
+    String? cattleGroupId, // <-- new field
+    String? cattleGroupName, // <-- new field
     /// Date stored as ISO‑8601 `yyyy‑MM‑dd`.
     required String date,
 

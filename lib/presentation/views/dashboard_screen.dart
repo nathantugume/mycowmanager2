@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:mycowmanager/presentation/views/analytics_screen.dart';
 import 'package:mycowmanager/presentation/views/farm_setup_screen.dart';
+import 'package:mycowmanager/presentation/views/widgets/farm_drawer.dart';
 import 'package:provider/provider.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'activities_screen.dart';
@@ -128,7 +129,8 @@ class DashboardScreen extends StatelessWidget {
           ],);
         },
       ),
-      drawer: Drawer(),
+      drawer:FarmDrawer()
+      ,
 
     );
   }

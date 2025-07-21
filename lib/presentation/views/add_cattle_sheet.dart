@@ -41,11 +41,12 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
   Cattle? _selectedMother;
   Source? _selectedSource;
 
-
   CattleGroup? _selectedGroup;
   DateTime _startTime = DateTime.now();
 
   bool _groupsRequested = false; // avoid duplicate fetches
+  String? _tagError;
+  String? _nameError;
 
   @override
   void dispose() {
@@ -77,6 +78,8 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _preselectDropdowns();
     });
+    _tagCtrl.addListener(_validateTag);
+    _nameCtrl.addListener(_validateName);
   }
 
   void _startRetryWatcher() {
@@ -91,6 +94,37 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
     });
   }
 
+  void _validateTag() {
+    final tag = _tagCtrl.text.trim();
+    final cattleList = context.read<CattleViewModel>().cattleList;
+    final isDuplicate = cattleList.any(
+      (c) =>
+          c.tag.toLowerCase() == tag.toLowerCase() &&
+          c.status.toLowerCase() == 'active' &&
+          (widget.existingCattle == null || c.id != widget.existingCattle!.id),
+    );
+    setState(() {
+      _tagError = isDuplicate && tag.isNotEmpty
+          ? 'This tag is already in use by an active cow.'
+          : null;
+    });
+  }
+
+  void _validateName() {
+    final name = _nameCtrl.text.trim();
+    final cattleList = context.read<CattleViewModel>().cattleList;
+    final isDuplicate = cattleList.any(
+      (c) =>
+          c.name.toLowerCase() == name.toLowerCase() &&
+          c.status.toLowerCase() == 'active' &&
+          (widget.existingCattle == null || c.id != widget.existingCattle!.id),
+    );
+    setState(() {
+      _nameError = isDuplicate && name.isNotEmpty
+          ? 'This name is already in use by an active cow.'
+          : null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +142,6 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
     final isLoading = context.watch<CattleViewModel>().isLoading;
     final operationalStatus = context.watch<CattleViewModel>().operationStatus;
 
-
     // Show a loader until farm is ready
     if (currentFarm == null) {
       return const SizedBox(
@@ -116,7 +149,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     // fetch groups once when we have a farm selected
     if (!_groupsRequested) {
       _groupsRequested = true;
@@ -126,8 +159,6 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
         sourceVm.getByFarmId(currentFarm.id);
       });
     }
-    
-    
 
     final groups = groupVm.cattleList;
 
@@ -149,18 +180,37 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
             ),
             Align(
               alignment: Alignment.topRight,
-              child: TextButton(onPressed: (){
-                //close
-                Navigator.pop(context);
-              }, child: Text("X", style: TextStyle(fontSize: 18),)),
+              child: TextButton(
+                onPressed: () {
+                  //close
+                  Navigator.pop(context);
+                },
+                child: Text("X", style: TextStyle(fontSize: 18)),
+              ),
             ),
             Text('Add New Cow', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
 
             _tf(_nameCtrl, 'Name'),
-            SizedBox(height: 10,),
+            if (_nameError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  _nameError!,
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+            SizedBox(height: 10),
             _tf(_tagCtrl, 'Tag / Ear‑tag'),
-            SizedBox(height: 10,),
+            if (_tagError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  _tagError!,
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+            SizedBox(height: 10),
 
             // Gender dropdown
             DropdownButtonFormField<String>(
@@ -169,22 +219,30 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                 DropdownMenuItem(value: 'Female', child: Text('Female')),
                 DropdownMenuItem(value: 'Male', child: Text('Male')),
               ],
-              decoration: const InputDecoration(border: OutlineInputBorder(),labelText: 'Gender'),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Gender',
+              ),
               onChanged: (v) => setState(() => _selectedGender = v),
             ),
-            SizedBox(height: 10,),
+            SizedBox(height: 10),
 
             DropdownButtonFormField<String>(
               value: _selectedBreed,
               items: [
                 const DropdownMenuItem(value: null, child: Text('None')),
-                ...breedVm.breedList.map((b) =>
-                    DropdownMenuItem(value: b.name, child: Text(b.name))),
-                const DropdownMenuItem(value: '__add__', child: Text('➕ Add new breed')),
+                ...breedVm.breedList.map(
+                  (b) => DropdownMenuItem(value: b.name, child: Text(b.name)),
+                ),
+                const DropdownMenuItem(
+                  value: '__add__',
+                  child: Text('➕ Add new breed'),
+                ),
               ],
               decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Breed'),
+                border: OutlineInputBorder(),
+                labelText: 'Breed',
+              ),
               onChanged: (value) async {
                 if (value == '__add__') {
                   final newName = await _showAddDialog(context, 'Breed');
@@ -193,8 +251,12 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                       id: '', // let backend generate ID if needed
                       farmId: currentFarm.id,
                       name: newName.trim(),
-                      createdOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                      updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
+                      createdOn: DateFormat(
+                        'dd-MM-yyyy HH:mm:ss',
+                      ).format(DateTime.now()),
+                      updatedOn: DateFormat(
+                        'dd-MM-yyyy HH:mm:ss',
+                      ).format(DateTime.now()),
                       farmName: currentFarm.name,
                     );
                     await breedVm.add(newBreed);
@@ -205,7 +267,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                 }
               },
             ),
-            SizedBox(height: 10,),
+            SizedBox(height: 10),
 
             DropdownButtonFormField<Source?>(
               value: _selectedSource,
@@ -214,18 +276,22 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                   value: null,
                   child: Text('None'),
                 ),
-                ...sources.map((s) => DropdownMenuItem(
-                  value: s,
-                  child: Text(s.name),
-                )),
+                ...sources.map(
+                  (s) => DropdownMenuItem(value: s, child: Text(s.name)),
+                ),
                 const DropdownMenuItem<Source?>(
-                  value: Source(id: '__add__', name: '➕ Add new source', farmId: ''),
+                  value: Source(
+                    id: '__add__',
+                    name: '➕ Add new source',
+                    farmId: '',
+                  ),
                   child: Text('➕ Add new source'),
                 ),
               ],
               decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Source of Cattle'),
+                border: OutlineInputBorder(),
+                labelText: 'Source of Cattle',
+              ),
               onChanged: (value) async {
                 if (value?.id == '__add__') {
                   final newName = await _showAddDialog(context, 'Source');
@@ -234,108 +300,128 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                       id: '',
                       name: newName.trim(),
                       farmId: currentFarm.id,
-                      createdAt: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+                      createdAt: DateFormat(
+                        'yyyy-MM-dd HH:mm:ss',
+                      ).format(DateTime.now()),
                     );
                     await sourceVm.add(newSource);
                     await sourceVm.getByFarmId(currentFarm.id); // refresh list
 
                     setState(() {
                       _selectedSource = sourceVm.sourcesList.firstWhere(
-                            (s) => s.name.toLowerCase() == newSource.name.toLowerCase(),
+                        (s) =>
+                            s.name.toLowerCase() ==
+                            newSource.name.toLowerCase(),
                         // orElse: () => '',
                       );
                     });
-
                   }
                 } else {
                   setState(() => _selectedSource = value);
                 }
               },
             ),
-            SizedBox(height: 10,),
-
+            SizedBox(height: 10),
 
             // Group dropdown or add button
             ...[
-            DropdownButtonFormField<CattleGroup?>(
-              value: _selectedGroup,
-              items: [
-                const DropdownMenuItem<CattleGroup?>(
-                  value: null,
-                  child: Text('None'),
-                ),
-                ...groups.map(
-                      (g) => DropdownMenuItem(value: g, child: Text(g.name)),
-                ),
-                const DropdownMenuItem<CattleGroup?>(
-                  value: CattleGroup(
-                    id: '__add__',
-                    name: '➕ Add new group',
-                    farmId: '',
-                    farmName: '',
-                    createdOn: '',
-                    updatedOn: '',
+              DropdownButtonFormField<CattleGroup?>(
+                value: _selectedGroup,
+                items: [
+                  const DropdownMenuItem<CattleGroup?>(
+                    value: null,
+                    child: Text('None'),
                   ),
-                  child: Text('➕ Add new group'),
+                  ...groups.map(
+                    (g) => DropdownMenuItem(value: g, child: Text(g.name)),
+                  ),
+                  const DropdownMenuItem<CattleGroup?>(
+                    value: CattleGroup(
+                      id: '__add__',
+                      name: '➕ Add new group',
+                      farmId: '',
+                      farmName: '',
+                      createdOn: '',
+                      updatedOn: '',
+                    ),
+                    child: Text('➕ Add new group'),
+                  ),
+                ],
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Group',
                 ),
-              ],
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                  labelText: 'Group'),
-              onChanged: (v) async {
-                // Handle "Add new group"
-                if (v?.id == '__add__') {
-                  final newName = await _showAddDialog(context, 'Group');
-                  if (newName != null && newName.trim().isNotEmpty) {
-                    final newGroup = CattleGroup(
-                      id: '',
-                      farmId: currentFarm.id,
-                      farmName: currentFarm.name,
-                      name: newName.trim(),
-                      createdOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                      updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                    );
-                    await groupVm.add(newGroup);
-                    setState(() => _selectedGroup = newGroup);
+                onChanged: (v) async {
+                  // Handle "Add new group"
+                  if (v?.id == '__add__') {
+                    final newName = await _showAddDialog(context, 'Group');
+                    if (newName != null && newName.trim().isNotEmpty) {
+                      final newGroup = CattleGroup(
+                        id: '',
+                        farmId: currentFarm.id,
+                        farmName: currentFarm.name,
+                        name: newName.trim(),
+                        createdOn: DateFormat(
+                          'dd-MM-yyyy HH:mm:ss',
+                        ).format(DateTime.now()),
+                        updatedOn: DateFormat(
+                          'dd-MM-yyyy HH:mm:ss',
+                        ).format(DateTime.now()),
+                      );
+                      await groupVm.add(newGroup);
+                      setState(() => _selectedGroup = newGroup);
+                    }
+                  } else {
+                    setState(() => _selectedGroup = v);
                   }
-                } else {
-                  setState(() => _selectedGroup = v);
-                }
-              },
-            ),
-          ],
-            SizedBox(height: 10,),
+                },
+              ),
+            ],
+            SizedBox(height: 10),
             DropdownButtonFormField<Cattle>(
               value: _selectedFather,
               items: maleCattle
-                  .map((c) => DropdownMenuItem(value: c, child: Text("${c.tag}-${c.name}")))
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text("${c.tag}-${c.name}"),
+                    ),
+                  )
                   .toList(),
               decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Father (Tag)'),
+                border: OutlineInputBorder(),
+                labelText: 'Father (Tag)',
+              ),
               onChanged: (cattle) => setState(() => _selectedFather = cattle),
             ),
-            SizedBox(height: 10,),
+            SizedBox(height: 10),
 
             DropdownButtonFormField<Cattle>(
               value: _selectedMother,
               items: femaleCattle
-                  .map((c) => DropdownMenuItem(value: c, child: Text("${c.tag} - ${c.name}")))
+                  .map(
+                    (c) => DropdownMenuItem(
+                      value: c,
+                      child: Text("${c.tag} - ${c.name}"),
+                    ),
+                  )
                   .toList(),
               decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Mother (Tag)'),
+                border: OutlineInputBorder(),
+                labelText: 'Mother (Tag)',
+              ),
               onChanged: (cattle) => setState(() => _selectedMother = cattle),
             ),
-          SizedBox(height: 10,),
+            SizedBox(height: 10),
 
             // Date picker
             TextField(
               controller: _dobCtrl,
               readOnly: true,
               decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Date of Birth'),
+                border: OutlineInputBorder(),
+                labelText: 'Date of Birth',
+              ),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
@@ -348,7 +434,7 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
                 }
               },
             ),
-            SizedBox(height: 10,),
+            SizedBox(height: 10),
             _tf(_weightCtrl, 'Weight (kg)', keyboardType: TextInputType.number),
 
             const SizedBox(height: 18),
@@ -357,50 +443,55 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
               child: FilledButton.icon(
                 icon: isLoading
                     ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                     : const Icon(Icons.save),
                 label: Text(isLoading ? 'Saving...' : 'Save'),
-                onPressed: isLoading
+                onPressed: isLoading || _tagError != null || _nameError != null
                     ? null
                     : () async {
-                  if (!_validate(context, farm: currentFarm)) return;
+                        if (!_validate(context, farm: currentFarm)) return;
 
-                  final cattle = Cattle(
-                    id: widget.existingCattle?.id ?? '',
-                    farmId: currentFarm.id,
-                    farmName: currentFarm.name,
-                    name: _nameCtrl.text.trim(),
-                    breed: _selectedBreed!,
-                    tag: _tagCtrl.text.trim(),
-                    dob: _dobCtrl.text.trim(),
-                    gender: _selectedGender!,
-                    cattleGroup: _selectedGroup!.id,
-                    source: _selectedSource!.name,
-                    createdOn: widget.existingCattle?.createdOn ??
-                        DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                    updatedOn: DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now()),
-                    status: 'active',
-                    fatherTag: _selectedFather?.tag,
-                    motherTag: _selectedMother?.tag,
-                    weight: _weightCtrl.text.trim(),
-                  );
+                        final cattle = Cattle(
+                          id: widget.existingCattle?.id ?? '',
+                          farmId: currentFarm.id,
+                          farmName: currentFarm.name,
+                          name: _nameCtrl.text.trim(),
+                          breed: _selectedBreed!,
+                          tag: _tagCtrl.text.trim(),
+                          dob: _dobCtrl.text.trim(),
+                          gender: _selectedGender!,
+                          cattleGroup: _selectedGroup!.id,
+                          source: _selectedSource!.name,
+                          createdOn:
+                              widget.existingCattle?.createdOn ??
+                              DateFormat(
+                                'dd-MM-yyyy HH:mm:ss',
+                              ).format(DateTime.now()),
+                          updatedOn: DateFormat(
+                            'dd-MM-yyyy HH:mm:ss',
+                          ).format(DateTime.now()),
+                          status: 'active',
+                          fatherTag: _selectedFather?.tag,
+                          motherTag: _selectedMother?.tag,
+                          weight: _weightCtrl.text.trim(),
+                        );
 
-                  final cattleVm = context.read<CattleViewModel>();
-                  if (widget.existingCattle != null) {
-                    await cattleVm.update(cattle.id, cattle);
-                  } else {
-                    await cattleVm.add(cattle);
-                  }
+                        final cattleVm = context.read<CattleViewModel>();
+                        if (widget.existingCattle != null) {
+                          await cattleVm.update(cattle.id, cattle);
+                        } else {
+                          await cattleVm.add(cattle);
+                        }
 
-                  if (!context.mounted) return;
-                  Navigator.pop(context);
-                },
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                      },
               ),
             ),
 
@@ -412,17 +503,20 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
   }
 
   // ───────────────────────────────────────── helpers
-  TextField _tf(TextEditingController c, String label,
-      {TextInputType keyboardType = TextInputType.text}) {
+  TextField _tf(
+    TextEditingController c,
+    String label, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextField(
       controller: c,
       keyboardType: keyboardType,
       decoration: InputDecoration(
-          border: OutlineInputBorder(),
-          labelText: label),
+        border: OutlineInputBorder(),
+        labelText: label,
+      ),
     );
   }
-
 
   bool _validate(BuildContext ctx, {required dynamic farm}) {
     if (farm == null) {
@@ -464,29 +558,39 @@ class _AddCattleSheetState extends State<AddCattleSheet> {
       _selectedGroup = allGroups.any((g) => g.id == cattle.cattleGroup)
           ? allGroups.firstWhere((g) => g.id == cattle.cattleGroup)
           : null;
-      _selectedBreed = allBreed.any((b) => b.name.toLowerCase() == cattle.breed.toLowerCase())
-          ? allBreed.firstWhere((b) => b.name.toLowerCase() == cattle.breed.toLowerCase()).name
+      _selectedBreed =
+          allBreed.any(
+            (b) => b.name.toLowerCase() == cattle.breed.toLowerCase(),
+          )
+          ? allBreed
+                .firstWhere(
+                  (b) => b.name.toLowerCase() == cattle.breed.toLowerCase(),
+                )
+                .name
           : null;
 
-
-
-      _selectedSource = allSources.any((s) =>
-      s.name.toLowerCase() == cattle.source.toLowerCase())
-          ? allSources.firstWhere((s) =>
-      s.name.toLowerCase() == cattle.source.toLowerCase())
+      _selectedSource =
+          allSources.any(
+            (s) => s.name.toLowerCase() == cattle.source.toLowerCase(),
+          )
+          ? allSources.firstWhere(
+              (s) => s.name.toLowerCase() == cattle.source.toLowerCase(),
+            )
           : null;
 
-      _selectedFather = cattle.fatherTag != null && allCattle.any((c) => c.tag == cattle.fatherTag)
+      _selectedFather =
+          cattle.fatherTag != null &&
+              allCattle.any((c) => c.tag == cattle.fatherTag)
           ? allCattle.firstWhere((c) => c.tag == cattle.fatherTag)
           : null;
 
-      _selectedMother = cattle.motherTag != null && allCattle.any((c) => c.tag == cattle.motherTag)
+      _selectedMother =
+          cattle.motherTag != null &&
+              allCattle.any((c) => c.tag == cattle.motherTag)
           ? allCattle.firstWhere((c) => c.tag == cattle.motherTag)
           : null;
-
     });
   }
-
 }
 
 Future<String?> _showAddDialog(BuildContext context, String label) async {

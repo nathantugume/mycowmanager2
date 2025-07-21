@@ -8,7 +8,8 @@ import '../viewmodels/cattle_view_model.dart';
 import '../viewmodels/farm_view_model.dart';
 
 class ActivityFormController extends StatefulWidget {
-  const ActivityFormController({super.key});
+  final Activity? existingActivity;
+  const ActivityFormController({super.key, this.existingActivity});
 
   @override
   State<ActivityFormController> createState() => _ActivityFormControllerState();
@@ -49,7 +50,26 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
     _activityVm = context.read<ActivitiesViewModel>();
 
     _farmVm.loadForCurrentUser();
-    _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (widget.existingActivity != null) {
+      final a = widget.existingActivity!;
+      _activityTypeCtrl.text = a.type;
+      _dateCtrl.text = a.date;
+      _performedByCtrl.text = a.performedBy ?? '';
+      _notesCtrl.text = a.notes ?? '';
+      _diagnosisCtrl.text = a.diagnosis ?? '';
+      _symptomsCtrl.text = a.symptoms?.join(', ') ?? '';
+      _medicationsCtrl.text = a.medications?.join(', ') ?? '';
+      _vaccineNameCtrl.text = a.vaccineName ?? '';
+      _vaccineDoseCtrl.text = a.vaccineDose ?? '';
+      _weightCtrl.text = a.weight ?? '';
+      _weightUnitCtrl.text = a.weightUnit ?? '';
+      _breedingTypeCtrl.text = a.breedingType ?? '';
+      _sireTagCtrl.text = a.sireTag ?? '';
+      _selectedActivityType = a.type;
+      _selectedCowId = a.cattleId;
+    } else {
+      _dateCtrl.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    }
   }
 
   @override
@@ -116,6 +136,11 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
       }
     });
 
+    // Ensure selected cow is in the list, else set to null (but do NOT call setState here)
+    final dropdownCowId = (cattleList.map((c) => c.id).contains(_selectedCowId))
+        ? _selectedCowId
+        : null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -152,7 +177,7 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
               border: OutlineInputBorder(),
               labelText: 'Select Cow',
             ),
-            value: _selectedCowId,
+            value: dropdownCowId,
             items: cattleList.map((cattle) {
               return DropdownMenuItem(
                 value: cattle.id,
@@ -198,7 +223,15 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
                       ),
                     )
                   : const Icon(Icons.save),
-              label: Text(_isLoading ? 'Saving...' : 'Save Activity'),
+              label: Text(
+                _isLoading
+                    ? (widget.existingActivity != null
+                          ? 'Updating...'
+                          : 'Saving...')
+                    : (widget.existingActivity != null
+                          ? 'Update Activity'
+                          : 'Save Activity'),
+              ),
               onPressed: _isLoading ? null : _onSave,
             ),
           ),
@@ -211,6 +244,7 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
     if (_isLoading) return; // Prevent multiple submissions
 
     final farm = context.read<CurrentFarm>().farm;
+    final cattleList = context.read<CattleViewModel>().cattleList;
     if (farm == null ||
         _selectedCowId == null ||
         _selectedActivityType == null ||
@@ -223,11 +257,21 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
 
     setState(() => _isLoading = true);
 
+    // Find the selected cow for cattleName
+    final selectedCow = cattleList.firstWhere(
+      (c) => c.id == _selectedCowId,
+      orElse: () => null as dynamic, // workaround for nullable result
+    );
+    final cattleName = selectedCow != null
+        ? '${selectedCow.tag} - ${selectedCow.name}'
+        : null;
+
     // Create the activity object
     final activity = Activity(
-      id: '',
+      id: widget.existingActivity?.id ?? '',
       farmId: farm.id,
       cattleId: _selectedCowId!,
+      cattleName: cattleName,
       type: _selectedActivityType!,
       date: _dateCtrl.text.trim(),
       farmName: farm.name,
@@ -250,11 +294,17 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
       weightUnit: _weightUnitCtrl.text.trim(),
       breedingType: _breedingTypeCtrl.text.trim(),
       sireTag: _sireTagCtrl.text.trim(),
-      createdOn: DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+      createdOn:
+          widget.existingActivity?.createdOn ??
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
     );
 
     try {
-      await _activityVm.add(activity);
+      if (widget.existingActivity != null) {
+        await _activityVm.update(activity.id, activity);
+      } else {
+        await _activityVm.add(activity);
+      }
 
       if (!mounted) {
         setState(() => _isLoading = false);
@@ -274,7 +324,13 @@ class _ActivityFormControllerState extends State<ActivityFormController> {
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Activity saved successfully!')),
+        SnackBar(
+          content: Text(
+            widget.existingActivity != null
+                ? 'Activity updated successfully!'
+                : 'Activity saved successfully!',
+          ),
+        ),
       );
 
       // Clear form and close modal

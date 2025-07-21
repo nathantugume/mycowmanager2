@@ -43,7 +43,7 @@ Future<void> _exportToPdf(BuildContext context) async {
                   a.cattleName ?? '',
                   a.performedBy ?? '',
                   (a.notes ?? '').length > 30
-                      ? a.notes!.substring(0, 30) + '...'
+                      ? '${a.notes!.substring(0, 30)}...'
                       : (a.notes ?? ''),
                 ],
             ],
@@ -395,7 +395,7 @@ class _ActivitiesTable extends StatelessWidget {
                   message: activity.notes ?? '',
                   child: Text(
                     (activity.notes ?? '').length > 20
-                        ? activity.notes!.substring(0, 20) + '...'
+                        ? '${activity.notes!.substring(0, 20)}...'
                         : (activity.notes ?? ''),
                   ),
                 ),

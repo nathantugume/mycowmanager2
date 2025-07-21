@@ -40,24 +40,24 @@ class _CattleReportScreenState extends State<CattleReportScreen> {
   void initState() {
     super.initState();
     // Delay to ensure context is available
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final width = MediaQuery.of(context).size.width;
-      if (width < 600) {
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-      }
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   final width = MediaQuery.of(context).size.width;
+    //   if (width < 600) {
+    //     SystemChrome.setPreferredOrientations([
+    //       DeviceOrientation.landscapeLeft,
+    //       DeviceOrientation.landscapeRight,
+    //     ]);
+    //   }
+    // });
   }
 
   @override
   void dispose() {
     // Reset to portrait only when leaving this page
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    // SystemChrome.setPreferredOrientations([
+    //   DeviceOrientation.portraitUp,
+    //   DeviceOrientation.portraitDown,
+    // ]);
     super.dispose();
   }
 
@@ -288,22 +288,30 @@ class _ReportHeader extends StatelessWidget {
               label: Text(dateLabel),
             ),
             const SizedBox(width: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final status in [
-                  'Active',
-                  'All',
-                  'Sold',
-                  'Dead',
-                  'Archived',
-                ])
-                  FilterChip(
-                    label: Text(status),
-                    selected: filter.status == status,
-                    onSelected: (_) => filter.setStatus(status),
-                  ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final status in [
+                      'Active',
+                      'All',
+                      'Sold',
+                      'Dead',
+                      'Archived',
+                    ])
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                        child: FilterChip(
+                          label: Text(status),
+                          selected: filter.status == status,
+                          onSelected: (_) => filter.setStatus(status),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
